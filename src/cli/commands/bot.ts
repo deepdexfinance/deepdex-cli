@@ -3,6 +3,7 @@
  */
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { consola } from "consola";
 import { ensureDirectories } from "../../config/index.ts";
 import {
 	isUnlocked,
@@ -11,16 +12,8 @@ import {
 } from "../../services/wallet.ts";
 import type { BotStatus, BotStrategy } from "../../types/index.ts";
 import { BOT_LOG_PATH, BOT_PID_PATH } from "../../utils/constants.ts";
-import {
-	bold,
-	dim,
-	error,
-	formatDuration,
-	info,
-	success,
-	warning,
-} from "../../utils/format.ts";
-import { confirm, keyValue, promptPassword, table } from "../../utils/ui.ts";
+import { bold, dim, formatDuration } from "../../utils/format.ts";
+import { confirm, promptPassword, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, optionalArg } from "../parser.ts";
 
@@ -108,28 +101,28 @@ export async function start(args: ParsedArgs): Promise<void> {
 	}
 
 	console.log();
-	console.log(bold("🤖 Starting Trading Bot\n"));
-	console.log(
-		keyValue(
-			{
-				Strategy: `${strategy.name} - ${strategy.description}`,
-				Account: accountName,
-				"Risk Level": strategy.riskLevel,
-				Mode: daemon ? "Background (daemon)" : "Foreground",
-			},
-			2,
-		),
-	);
+	consola.box({
+		title: "🤖 Starting Trading Bot",
+		message: `Strategy: ${strategy.name}
+${strategy.description}
+
+Account: ${accountName}
+Risk Level: ${strategy.riskLevel}
+Mode: ${daemon ? "Background (daemon)" : "Foreground"}`,
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
 
 	// Confirm
 	if (!args.flags.yes) {
 		console.log();
-		console.log(
-			warning("⚠️  The bot will execute real trades with your funds."),
-		);
+		consola.warn("The bot will execute real trades with your funds.");
 		const confirmed = await confirm("Start the bot?", true);
 		if (!confirmed) {
-			console.log(info("Cancelled."));
+			consola.info("Cancelled.");
 			return;
 		}
 	}
@@ -146,7 +139,7 @@ export async function start(args: ParsedArgs): Promise<void> {
 	writeFileSync(BOT_PID_PATH, JSON.stringify(botState, null, 2));
 
 	console.log();
-	console.log(success(`Bot started! (PID: ${process.pid})`));
+	consola.success(`Bot started! (PID: ${process.pid})`);
 
 	if (daemon) {
 		console.log(
@@ -159,12 +152,8 @@ export async function start(args: ParsedArgs): Promise<void> {
 		console.log();
 
 		// In production, this would start the actual bot loop
-		// For now, we simulate it
-		console.log(info("Bot is running... (simulation mode)"));
+		consola.info("Bot is running... (simulation mode)");
 		console.log(dim("  Watching for trading opportunities..."));
-
-		// Note: In a real implementation, this would be an async event loop
-		// that listens to price updates and executes trades
 	}
 
 	console.log();
@@ -175,31 +164,31 @@ export async function start(args: ParsedArgs): Promise<void> {
  */
 export async function stop(args: ParsedArgs): Promise<void> {
 	if (!isBotRunning()) {
-		console.log(info("No bot is currently running."));
+		consola.info("No bot is currently running.");
 		return;
 	}
 
 	const status = getBotStatus();
 
 	console.log();
-	console.log(bold("🛑 Stopping Bot\n"));
-	console.log(
-		keyValue(
-			{
-				PID: status.pid?.toString(),
-				Strategy: status.strategy || "unknown",
-				Uptime: formatDuration(status.uptime || 0),
-			},
-			2,
-		),
-	);
+	consola.box({
+		title: "🛑 Stopping Bot",
+		message: `PID: ${status.pid}
+Strategy: ${status.strategy || "unknown"}
+Uptime: ${formatDuration(status.uptime || 0)}`,
+		style: {
+			padding: 1,
+			borderColor: "red",
+			borderStyle: "rounded",
+		},
+	});
 
 	// Confirm
 	if (!args.flags.yes) {
 		console.log();
 		const confirmed = await confirm("Stop the bot?", true);
 		if (!confirmed) {
-			console.log(info("Cancelled."));
+			consola.info("Cancelled.");
 			return;
 		}
 	}
@@ -209,9 +198,9 @@ export async function stop(args: ParsedArgs): Promise<void> {
 	try {
 		unlinkSync(BOT_PID_PATH);
 		console.log();
-		console.log(success("Bot stopped gracefully."));
+		consola.success("Bot stopped gracefully.");
 	} catch {
-		console.log(error("Failed to stop bot. You may need to kill it manually."));
+		consola.error("Failed to stop bot. You may need to kill it manually.");
 	}
 
 	console.log();
@@ -228,28 +217,24 @@ export async function status(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	console.log(bold("\n🤖 Bot Status\n"));
+	console.log();
+	consola.box({
+		title: "🤖 Bot Status",
+		message: status.running
+			? `Status: Running
+PID: ${status.pid}
+Strategy: ${status.strategy || "unknown"}
+Account: ${status.account || "default"}
+Started: ${new Date(status.startedAt!).toLocaleString()}
+Uptime: ${formatDuration(status.uptime || 0)}`
+			: "Bot is not running.\n\nStart with: deepdex bot start [strategy]",
+		style: {
+			padding: 1,
+			borderColor: status.running ? "green" : "gray",
+			borderStyle: "rounded",
+		},
+	});
 
-	if (!status.running) {
-		console.log(dim("  Bot is not running."));
-		console.log(dim("  Start with: deepdex bot start [strategy]"));
-		console.log();
-		return;
-	}
-
-	console.log(
-		keyValue(
-			{
-				Status: "✓ Running",
-				PID: status.pid?.toString(),
-				Strategy: status.strategy || "unknown",
-				Account: status.account || "default",
-				"Started At": new Date(status.startedAt!).toLocaleString(),
-				Uptime: formatDuration(status.uptime || 0),
-			},
-			2,
-		),
-	);
 	console.log();
 }
 
@@ -261,12 +246,22 @@ export async function logs(args: ParsedArgs): Promise<void> {
 	const lines = getFlag<number>(args.raw, "lines") || 50;
 
 	if (!existsSync(BOT_LOG_PATH)) {
-		console.log(info("No logs found."));
+		consola.info("No logs found.");
 		console.log(dim(`  Log file: ${BOT_LOG_PATH}`));
 		return;
 	}
 
-	console.log(bold(`\n📋 Bot Logs (last ${lines} lines)\n`));
+	consola.box({
+		title: `📋 Bot Logs (last ${lines} lines)`,
+		message: `Log file: ${BOT_LOG_PATH}`,
+		style: {
+			padding: 1,
+			borderColor: "blue",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	try {
 		const content = readFileSync(BOT_LOG_PATH, "utf8");
@@ -279,11 +274,11 @@ export async function logs(args: ParsedArgs): Promise<void> {
 
 		if (follow) {
 			console.log();
-			console.log(dim("  Watching for new logs... (Ctrl+C to stop)"));
+			consola.info("Watching for new logs... (Ctrl+C to stop)");
 			// In production, this would tail the log file
 		}
 	} catch {
-		console.log(error("Failed to read log file."));
+		consola.error("Failed to read log file.");
 	}
 
 	console.log();
@@ -298,10 +293,21 @@ export async function listStrategies(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	console.log(bold("\n📚 Available Trading Strategies\n"));
+	console.log();
+	consola.box({
+		title: "📚 Available Trading Strategies",
+		message: "Choose a strategy when starting the bot",
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	const tableData = STRATEGIES.map((s) => ({
-		Name: s.name,
+		Name: bold(s.name),
 		Description: s.description,
 		Risk: s.riskLevel,
 	}));
@@ -317,7 +323,8 @@ export async function listStrategies(args: ParsedArgs): Promise<void> {
 		),
 	);
 
-	console.log(dim("\nUsage: deepdex bot start <strategy> [--config path]"));
+	console.log();
+	consola.info("Usage: deepdex bot start <strategy> [--config path]");
 	console.log();
 }
 

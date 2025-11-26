@@ -2,6 +2,7 @@
  * Formatting utilities for DeepDex CLI
  */
 
+import { consola } from "consola";
 import { type Address, formatUnits } from "viem";
 import { COLORS, SYMBOLS, USDC_DECIMALS } from "./constants.ts";
 
@@ -76,7 +77,6 @@ export function formatPercent(value: number, showSign = true): string {
  * Format P&L with color
  */
 export function formatPnL(pnl: bigint, decimals = USDC_DECIMALS): string {
-	const _value = Number(formatUnits(pnl, decimals));
 	const formatted = formatUSD(pnl >= 0n ? pnl : -pnl, decimals);
 	const sign = pnl >= 0n ? "+" : "-";
 	const color = pnl >= 0n ? COLORS.up : COLORS.down;
@@ -161,7 +161,7 @@ export function formatPair(pair: string): string {
 }
 
 // ============================================================================
-// Status Formatting
+// Status Formatting (using consola colors)
 // ============================================================================
 
 /**
@@ -197,6 +197,45 @@ export function info(message: string): string {
  */
 export function pending(message: string): string {
 	return `${SYMBOLS.pending} ${message}`;
+}
+
+// ============================================================================
+// Consola Logging Helpers
+// ============================================================================
+
+/**
+ * Log success with consola
+ */
+export function logSuccess(message: string): void {
+	consola.success(message);
+}
+
+/**
+ * Log error with consola
+ */
+export function logError(message: string): void {
+	consola.error(message);
+}
+
+/**
+ * Log warning with consola
+ */
+export function logWarning(message: string): void {
+	consola.warn(message);
+}
+
+/**
+ * Log info with consola
+ */
+export function logInfo(message: string): void {
+	consola.info(message);
+}
+
+/**
+ * Log box with consola
+ */
+export function logBox(message: string): void {
+	consola.box(message);
 }
 
 // ============================================================================

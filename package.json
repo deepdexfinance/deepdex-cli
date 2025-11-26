@@ -34,6 +34,7 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
+		"consola": "^3.4.2",
 		"dotenv": "^17.2.3",
 		"viem": "^2.40.3",
 		"zod": "^4.1.13"

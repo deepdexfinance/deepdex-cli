@@ -124,6 +124,7 @@ export async function getBlockNumber(): Promise<bigint> {
 
 /**
  * Get user's subaccounts
+ * @alias getSubaccounts
  */
 export async function getUserSubaccounts(
 	owner: Address,
@@ -714,4 +715,165 @@ export async function modifyTpSl(
 	});
 
 	return hash;
+}
+
+// ============================================================================
+// Token Operations
+// ============================================================================
+
+/**
+ * Get ERC20 token balance
+ */
+export async function getTokenBalance(
+	owner: Address,
+	tokenAddress: Address,
+): Promise<bigint> {
+	const client = getPublicClient();
+
+	return client.readContract({
+		address: tokenAddress,
+		abi: [
+			{
+				inputs: [{ name: "owner", type: "address" }],
+				name: "balanceOf",
+				outputs: [{ name: "", type: "uint256" }],
+				stateMutability: "view",
+				type: "function",
+			},
+		],
+		functionName: "balanceOf",
+		args: [owner],
+	}) as Promise<bigint>;
+}
+
+// ============================================================================
+// Convenience Aliases and Helper Functions
+// ============================================================================
+
+/**
+ * Alias for getUserSubaccounts
+ */
+export const getSubaccounts = getUserSubaccounts;
+
+/**
+ * Get user's positions for display (simplified for CLI)
+ */
+export async function getPositions(owner: Address): Promise<
+	{
+		market: string;
+		isLong: boolean;
+		size: bigint;
+		entryPrice: bigint;
+		markPrice: bigint;
+		unrealizedPnl: bigint;
+		leverage: number;
+		margin: bigint;
+		takeProfit: bigint | null;
+		stopLoss: bigint | null;
+	}[]
+> {
+	// Get all perp market IDs
+	const { perp } = getMarkets();
+	const marketIds = perp.map((m) => Number.parseInt(m.pairId, 10));
+
+	// Get user's subaccounts first
+	const subaccounts = await getUserSubaccounts(owner);
+	if (subaccounts.length === 0) return [];
+
+	// For now, use the first subaccount
+	const subaccount = subaccounts[0];
+	if (!subaccount) return [];
+
+	const positions = await getUserPerpPositions(subaccount.address, marketIds);
+
+	return positions.map((p, i) => ({
+		market: perp[i]?.value || `Market ${i}`,
+		isLong: p.isLong,
+		size: p.baseAssetAmount,
+		entryPrice: p.entryPrice,
+		markPrice: 0n, // Would need to fetch
+		unrealizedPnl: p.unrealizedPnL,
+		leverage: Number(p.leverage),
+		margin: p.quoteAssetAmount,
+		takeProfit: p.takeProfit > 0n ? p.takeProfit : null,
+		stopLoss: p.stopLoss > 0n ? p.stopLoss : null,
+	}));
+}
+
+/**
+ * Get user's open orders for display (simplified for CLI)
+ */
+export async function getOpenOrders(owner: Address): Promise<
+	{
+		id: string;
+		market: string;
+		side: "buy" | "sell";
+		type: string;
+		price: bigint | null;
+		size: bigint;
+		filled: bigint;
+	}[]
+> {
+	// Get user's subaccounts first
+	const subaccounts = await getUserSubaccounts(owner);
+	if (subaccounts.length === 0) return [];
+
+	const subaccount = subaccounts[0];
+	if (!subaccount) return [];
+
+	const orders = await getUserActiveOrders(subaccount.address);
+
+	return orders.map((o) => ({
+		id: `0x${o.orderId.toString(16)}`,
+		market: `Market ${o.marketId}`,
+		side: o.isBuy ? "buy" : "sell",
+		type: o.orderType === 0 ? "market" : "limit",
+		price: o.price,
+		size: o.amount,
+		filled: o.filledAmount,
+	}));
+}
+
+/**
+ * Alias for cancelPerpOrder
+ */
+export const cancelOrder = cancelPerpOrder;
+
+/**
+ * Place spot order helper
+ */
+export async function placeSpotOrder(params: {
+	pair: string;
+	side: "buy" | "sell";
+	amount: bigint;
+	price?: bigint;
+	postOnly?: boolean;
+	reduceOnly?: boolean;
+}): Promise<Hex> {
+	// This is a simplified helper - implementation would depend on actual use case
+	throw new Error("Use placeSpotBuyOrder or placeSpotSellOrder directly");
+}
+
+/**
+ * Deposit to subaccount (placeholder for future implementation)
+ */
+export async function depositToSubaccount(
+	subaccount: Address,
+	token: Address,
+	amount: bigint,
+): Promise<Hex> {
+	// In production, this would call the appropriate deposit function
+	throw new Error("Deposit function not yet implemented for testnet");
+}
+
+/**
+ * Withdraw from subaccount (placeholder for future implementation)
+ */
+export async function withdrawFromSubaccount(
+	subaccount: Address,
+	token: Address,
+	amount: bigint,
+): Promise<Hex> {
+	// In production, this would call the appropriate withdraw function
+	throw new Error("Withdraw function not yet implemented for testnet");
 }

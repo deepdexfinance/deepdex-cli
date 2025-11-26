@@ -2,6 +2,7 @@
  * Market commands - Market data and information
  */
 
+import { consola } from "consola";
 import {
 	findMarket,
 	getLastTradePrice,
@@ -18,7 +19,7 @@ import {
 	formatPair,
 	formatPercent,
 } from "../../utils/format.ts";
-import { keyValue, spinner, table } from "../../utils/ui.ts";
+import { keyValue, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { requireArg } from "../parser.ts";
 
@@ -29,8 +30,7 @@ export async function list(args: ParsedArgs): Promise<void> {
 	const { spot, perp } = getMarkets();
 
 	// Fetch oracle prices
-	const spin = spinner("Fetching market data...");
-	spin.start();
+	consola.start("Fetching market data...");
 
 	let oraclePrices: { symbol: string; price: bigint }[] = [];
 	try {
@@ -38,7 +38,6 @@ export async function list(args: ParsedArgs): Promise<void> {
 	} catch {
 		// Ignore errors, show markets without prices
 	}
-	spin.stop("");
 
 	if (args.flags.json) {
 		console.log(JSON.stringify({ spot, perp, oraclePrices }, null, 2));
@@ -46,7 +45,18 @@ export async function list(args: ParsedArgs): Promise<void> {
 	}
 
 	// Spot Markets
-	console.log(bold("\n📈 Spot Markets\n"));
+	console.log();
+	consola.box({
+		title: "📈 Spot Markets",
+		message: "Available spot trading pairs",
+		style: {
+			padding: 1,
+			borderColor: "green",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	const spotData = spot.map((m) => {
 		const baseSymbol = m.tokens[0]?.symbol || "";
@@ -78,7 +88,18 @@ export async function list(args: ParsedArgs): Promise<void> {
 	);
 
 	// Perp Markets
-	console.log(bold("\n📊 Perpetual Markets\n"));
+	console.log();
+	consola.box({
+		title: "📊 Perpetual Markets",
+		message: "Available perpetual trading pairs",
+		style: {
+			padding: 1,
+			borderColor: "blue",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	const perpData = perp.map((m) => {
 		const baseSymbol = m.tokens[0]?.symbol || "";
@@ -108,6 +129,8 @@ export async function list(args: ParsedArgs): Promise<void> {
 			perpData,
 		),
 	);
+
+	console.log();
 }
 
 /**
@@ -126,7 +149,18 @@ export async function info(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	console.log(bold(`\n📊 Market: ${market.value}\n`));
+	console.log();
+	consola.box({
+		title: `📊 Market: ${market.value}`,
+		message: market.isPerp ? "Perpetual Market" : "Spot Market",
+		style: {
+			padding: 1,
+			borderColor: market.isPerp ? "blue" : "green",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	const data: Record<string, string> = {
 		Type: market.isPerp ? "Perpetual" : "Spot",
@@ -146,7 +180,8 @@ export async function info(args: ParsedArgs): Promise<void> {
 	console.log(keyValue(data, 2));
 
 	// Tokens
-	console.log(bold("\n  Tokens:"));
+	console.log();
+	console.log(bold("  Tokens:"));
 	for (const token of market.tokens) {
 		console.log(`    ${token.symbol}: ${token.address}`);
 	}
@@ -165,8 +200,7 @@ export async function price(args: ParsedArgs): Promise<void> {
 		throw new Error(`Market not found: ${pair}`);
 	}
 
-	const spin = spinner("Fetching prices...");
-	spin.start();
+	consola.start("Fetching prices...");
 
 	// Get oracle prices
 	const oraclePrices = await getOraclePrices();
@@ -190,8 +224,6 @@ export async function price(args: ParsedArgs): Promise<void> {
 		}
 	}
 
-	spin.stop("");
-
 	if (args.flags.json) {
 		console.log(
 			JSON.stringify(
@@ -208,7 +240,18 @@ export async function price(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	console.log(bold(`\n💰 ${market.value} Prices\n`));
+	console.log();
+	consola.box({
+		title: `💰 ${market.value} Prices`,
+		message: "Current market prices",
+		style: {
+			padding: 1,
+			borderColor: "yellow",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	const data: Record<string, string> = {};
 
@@ -226,10 +269,11 @@ export async function price(args: ParsedArgs): Promise<void> {
 	}
 
 	if (Object.keys(data).length === 0) {
-		data.Status = "Price data unavailable";
+		consola.warn("Price data unavailable");
+	} else {
+		console.log(keyValue(data, 2));
 	}
 
-	console.log(keyValue(data, 2));
 	console.log();
 }
 
@@ -244,8 +288,19 @@ export async function orderbook(args: ParsedArgs): Promise<void> {
 		throw new Error(`Market not found: ${pair}`);
 	}
 
-	console.log(bold(`\n📒 ${market.value} Orderbook\n`));
-	console.log(dim("  Orderbook data requires WebSocket connection."));
+	console.log();
+	consola.box({
+		title: `📒 ${market.value} Orderbook`,
+		message: "Live orderbook depth",
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
+	consola.info("Orderbook data requires WebSocket connection.");
 	console.log(dim("  This feature will be available in a future update."));
 	console.log();
 }
@@ -261,8 +316,19 @@ export async function trades(args: ParsedArgs): Promise<void> {
 		throw new Error(`Market not found: ${pair}`);
 	}
 
-	console.log(bold(`\n📜 ${market.value} Recent Trades\n`));
-	console.log(dim("  Trade history requires indexer integration."));
+	console.log();
+	consola.box({
+		title: `📜 ${market.value} Recent Trades`,
+		message: "Trade history",
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
+	consola.info("Trade history requires indexer integration.");
 	console.log(dim("  This feature will be available in a future update."));
 	console.log();
 }
@@ -284,8 +350,7 @@ export async function funding(args: ParsedArgs): Promise<void> {
 
 	const marketId = Number.parseInt(market.pairId, 10);
 
-	const spin = spinner("Fetching funding data...");
-	spin.start();
+	consola.start("Fetching funding data...");
 
 	let perpMarket: Awaited<ReturnType<typeof getPerpMarket>> = null;
 	try {
@@ -293,14 +358,24 @@ export async function funding(args: ParsedArgs): Promise<void> {
 	} catch {
 		// Ignore
 	}
-	spin.stop("");
 
 	if (args.flags.json) {
 		console.log(JSON.stringify({ market: market.value, perpMarket }, null, 2));
 		return;
 	}
 
-	console.log(bold(`\n💸 ${market.value} Funding\n`));
+	console.log();
+	consola.box({
+		title: `💸 ${market.value} Funding`,
+		message: "Funding rate information",
+		style: {
+			padding: 1,
+			borderColor: "yellow",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	if (perpMarket) {
 		const fundingRate = Number(perpMarket.fundingRate) / 1e6;
@@ -319,7 +394,7 @@ export async function funding(args: ParsedArgs): Promise<void> {
 			),
 		);
 	} else {
-		console.log(dim("  Funding data unavailable."));
+		consola.warn("Funding data unavailable.");
 	}
 
 	console.log();

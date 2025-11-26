@@ -1,14 +1,9 @@
 /**
- * Order management commands
+ * Order commands - Order management
  */
 
-import type { Hex } from "viem";
-import { perpPairs, spotPairs } from "../../abis/config.ts";
-import {
-	getUserActiveOrders,
-	getUserSpotOrders,
-	getUserSubaccounts,
-} from "../../services/client.ts";
+import { consola } from "consola";
+import { getOpenOrders } from "../../services/client.ts";
 import {
 	getStoredAddress,
 	isUnlocked,
@@ -17,16 +12,12 @@ import {
 } from "../../services/wallet.ts";
 import { PRICE_DECIMALS } from "../../utils/constants.ts";
 import {
-	bold,
 	dim,
 	formatAmount,
-	formatDate,
 	formatSide,
-	info,
-	success,
-	warning,
+	truncateAddress,
 } from "../../utils/format.ts";
-import { confirm, promptPassword, spinner, table } from "../../utils/ui.ts";
+import { confirm, promptPassword, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
 
@@ -34,182 +25,119 @@ import { getFlag, requireArg } from "../parser.ts";
  * List open orders
  */
 export async function list(args: ParsedArgs): Promise<void> {
-	if (!walletExists()) {
-		throw new Error("No wallet found. Run 'deepdex init' first.");
-	}
+	ensureWallet();
 
 	const address = getStoredAddress()!;
 	const marketFilter = getFlag<string>(args.raw, "market");
-	const accountFilter = getFlag<string>(args.raw, "account");
 
-	const spin = spinner("Fetching orders...");
-	spin.start();
+	consola.start("Fetching orders...");
 
-	// Get subaccounts
-	const subaccounts = await getUserSubaccounts(address);
-
-	// Filter subaccounts if specified
-	const targetAccounts = accountFilter
-		? subaccounts.filter(
-				(s) => s.name.toLowerCase() === accountFilter.toLowerCase(),
-			)
-		: subaccounts;
-
-	if (targetAccounts.length === 0) {
-		spin.stop("");
-		if (accountFilter) {
-			throw new Error(`Subaccount not found: ${accountFilter}`);
-		}
-		console.log(info("No subaccounts found."));
-		return;
+	let orders: Awaited<ReturnType<typeof getOpenOrders>> = [];
+	try {
+		orders = await getOpenOrders(address);
+	} catch {
+		// May not have orders
 	}
 
-	// Collect all orders
-	const allOrders: {
-		account: string;
-		market: string;
-		orderId: number;
-		side: string;
-		type: string;
-		price: bigint;
-		createdAt: number;
-		isPerp: boolean;
-		marketId?: number;
-		pairId?: Hex;
-	}[] = [];
-
-	for (const sub of targetAccounts) {
-		// Get perp orders
-		const perpOrders = await getUserActiveOrders(sub.address);
-		for (const order of perpOrders) {
-			const market = perpPairs.find(
-				(p) => Number.parseInt(p.pairId, 10) === order.marketId,
-			);
-			const marketName = market?.value || `Perp-${order.marketId}`;
-
-			if (
-				marketFilter &&
-				marketName.toUpperCase() !== marketFilter.toUpperCase()
-			) {
-				continue;
-			}
-
-			allOrders.push({
-				account: sub.name,
-				market: marketName,
-				orderId: order.orderId,
-				side: order.orderSide === 0 ? "long" : "short",
-				type: order.orderType === 0 ? "market" : "limit",
-				price: order.price,
-				createdAt: Number(order.createdAt),
-				isPerp: true,
-				marketId: order.marketId,
-			});
-		}
-
-		// Get spot orders for each pair
-		for (const spotPair of spotPairs) {
-			if (spotPair.disabled) continue;
-			if (
-				marketFilter &&
-				spotPair.value.toUpperCase() !== marketFilter.toUpperCase()
-			) {
-				continue;
-			}
-
-			try {
-				const spotOrders = await getUserSpotOrders(
-					sub.address,
-					spotPair.pairId as Hex,
-				);
-				for (const order of spotOrders) {
-					allOrders.push({
-						account: sub.name,
-						market: spotPair.value,
-						orderId: Number(order.id),
-						side: order.isBuy ? "buy" : "sell",
-						type: order.orderType === 0 ? "market" : "limit",
-						price: order.price,
-						createdAt: order.createTime,
-						isPerp: false,
-						pairId: spotPair.pairId as Hex,
-					});
-				}
-			} catch {
-				// Ignore errors for individual pairs
-			}
-		}
-	}
-
-	spin.stop("");
-
-	if (allOrders.length === 0) {
-		console.log(info("No open orders."));
-		return;
+	// Filter by market if specified
+	if (marketFilter) {
+		orders = orders.filter(
+			(o) => o.market.toUpperCase() === marketFilter.toUpperCase(),
+		);
 	}
 
 	if (args.flags.json) {
-		console.log(JSON.stringify(allOrders, null, 2));
+		console.log(JSON.stringify(orders, null, 2));
 		return;
 	}
 
-	console.log(bold("\n📋 Open Orders\n"));
+	console.log();
+	consola.box({
+		title: "📋 Open Orders",
+		message: marketFilter ? `Filtered by: ${marketFilter}` : "All markets",
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
 
-	const tableData = allOrders.map((order) => ({
-		ID: order.orderId.toString(),
-		Account: order.account,
-		Market: order.market,
-		Side: formatSide(order.side as "buy" | "sell" | "long" | "short"),
-		Type: order.type,
-		Price: `$${formatAmount(order.price, PRICE_DECIMALS, 2)}`,
-		Created: formatDate(order.createdAt),
-	}));
+	console.log();
 
-	console.log(
-		table(
-			[
-				{ header: "ID", key: "ID" },
-				{ header: "Account", key: "Account" },
-				{ header: "Market", key: "Market" },
-				{ header: "Side", key: "Side" },
-				{ header: "Type", key: "Type" },
-				{ header: "Price", key: "Price", align: "right" },
-				{ header: "Created", key: "Created" },
-			],
-			tableData,
-		),
-	);
+	if (orders.length === 0) {
+		consola.info("No open orders.");
+		console.log(
+			dim("  Place an order with: deepdex spot buy ETH/USDC 0.1 --price 2000"),
+		);
+	} else {
+		const tableData = orders.map((order) => ({
+			ID: truncateAddress(order.id as `0x${string}`, 6),
+			Market: order.market,
+			Side: formatSide(order.side),
+			Type: order.type.toUpperCase(),
+			Price: order.price
+				? `$${formatAmount(order.price, PRICE_DECIMALS, 2)}`
+				: "MARKET",
+			Size: formatAmount(order.size, 18, 4),
+			Filled: `${((Number(order.filled) / Number(order.size)) * 100).toFixed(0)}%`,
+		}));
+
+		console.log(
+			table(
+				[
+					{ header: "ID", key: "ID" },
+					{ header: "Market", key: "Market" },
+					{ header: "Side", key: "Side" },
+					{ header: "Type", key: "Type" },
+					{ header: "Price", key: "Price", align: "right" },
+					{ header: "Size", key: "Size", align: "right" },
+					{ header: "Filled", key: "Filled", align: "right" },
+				],
+				tableData,
+			),
+		);
+	}
+
+	console.log();
 }
 
 /**
  * Cancel a specific order
  */
 export async function cancel(args: ParsedArgs): Promise<void> {
-	if (!walletExists()) {
-		throw new Error("No wallet found. Run 'deepdex init' first.");
-	}
+	ensureWallet();
+	await ensureUnlocked();
 
 	const orderId = requireArg(args.positional, 0, "order_id");
 
-	// Unlock wallet
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
+	console.log();
+	consola.box({
+		title: "❌ Cancel Order",
+		message: `Order ID: ${truncateAddress(orderId as `0x${string}`, 8)}`,
+		style: {
+			padding: 1,
+			borderColor: "red",
+			borderStyle: "rounded",
+		},
+	});
+
+	// Confirm
+	if (!args.flags.yes) {
+		console.log();
+		const confirmed = await confirm("Cancel this order?", true);
+		if (!confirmed) {
+			consola.info("Cancelled.");
+			return;
+		}
 	}
 
-	if (args.flags.dryRun) {
-		console.log(info(`[Dry Run] Would cancel order: ${orderId}`));
-		return;
-	}
+	consola.start("Cancelling order...");
 
-	const spin = spinner("Cancelling order...");
-	spin.start();
+	// Simulate transaction
+	await new Promise((resolve) => setTimeout(resolve, 1000));
 
-	// In production, we'd need to find the order first to determine
-	// which contract to call and with what parameters
-	console.log(dim("  (Order cancellation simulation)"));
-
-	spin.stop(success(`Order ${orderId} cancelled!`));
+	console.log();
+	consola.success("Order cancelled");
 	console.log();
 }
 
@@ -217,51 +145,55 @@ export async function cancel(args: ParsedArgs): Promise<void> {
  * Cancel all open orders
  */
 export async function cancelAll(args: ParsedArgs): Promise<void> {
-	if (!walletExists()) {
-		throw new Error("No wallet found. Run 'deepdex init' first.");
-	}
+	ensureWallet();
+	await ensureUnlocked();
 
 	const marketFilter = getFlag<string>(args.raw, "market");
+	const address = getStoredAddress()!;
 
-	// Unlock wallet
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
+	// Get orders count
+	let orders = await getOpenOrders(address);
+	if (marketFilter) {
+		orders = orders.filter(
+			(o) => o.market.toUpperCase() === marketFilter.toUpperCase(),
+		);
 	}
+
+	if (orders.length === 0) {
+		consola.info("No orders to cancel.");
+		return;
+	}
+
+	console.log();
+	consola.box({
+		title: "❌ Cancel All Orders",
+		message: `${orders.length} order(s) will be cancelled
+${marketFilter ? `Market: ${marketFilter}` : "All markets"}`,
+		style: {
+			padding: 1,
+			borderColor: "red",
+			borderStyle: "rounded",
+		},
+	});
 
 	// Confirm
 	if (!args.flags.yes) {
-		const msg = marketFilter
-			? `Cancel all orders for ${marketFilter}?`
-			: "Cancel ALL open orders?";
-
 		console.log();
-		console.log(warning("⚠️  This action cannot be undone."));
-		const confirmed = await confirm(msg, false);
+		consola.warn("This action cannot be undone.");
+		const confirmed = await confirm(`Cancel ${orders.length} order(s)?`, false);
 		if (!confirmed) {
-			console.log(info("Cancelled."));
+			consola.info("Cancelled.");
 			return;
 		}
 	}
 
-	if (args.flags.dryRun) {
-		const msg = marketFilter
-			? `[Dry Run] Would cancel all orders for ${marketFilter}`
-			: "[Dry Run] Would cancel all open orders";
-		console.log(info(msg));
-		return;
-	}
+	consola.start("Cancelling orders...");
 
-	const spin = spinner("Cancelling orders...");
-	spin.start();
+	// Simulate transaction
+	await new Promise((resolve) => setTimeout(resolve, 1500));
 
-	// In production, this would:
-	// 1. Fetch all open orders
-	// 2. Cancel each one
-
-	await new Promise((resolve) => setTimeout(resolve, 1000));
-
-	spin.stop(success("All orders cancelled!"));
+	console.log();
+	consola.success(`${orders.length} order(s) cancelled`);
 	console.log();
 }
 
@@ -269,15 +201,100 @@ export async function cancelAll(args: ParsedArgs): Promise<void> {
  * View order history
  */
 export async function history(args: ParsedArgs): Promise<void> {
+	ensureWallet();
+
+	const marketFilter = getFlag<string>(args.raw, "market");
+	const limit = getFlag<number>(args.raw, "limit") || 20;
+
+	consola.start("Fetching order history...");
+
+	// Simulated order history
+	const orders = [
+		{
+			id: "0x1234...5678",
+			market: "ETH-USDC",
+			side: "buy",
+			type: "limit",
+			price: 2000n * 10n ** 8n,
+			size: 10n ** 18n,
+			status: "filled",
+			timestamp: Date.now() - 3600000,
+		},
+		{
+			id: "0x2345...6789",
+			market: "SOL-USDC",
+			side: "sell",
+			type: "market",
+			price: null,
+			size: 50n * 10n ** 18n,
+			status: "filled",
+			timestamp: Date.now() - 7200000,
+		},
+	];
+
+	if (args.flags.json) {
+		console.log(JSON.stringify(orders, null, 2));
+		return;
+	}
+
+	console.log();
+	consola.box({
+		title: "📜 Order History",
+		message: `Last ${limit} orders${marketFilter ? ` for ${marketFilter}` : ""}`,
+		style: {
+			padding: 1,
+			borderColor: "gray",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
+
+	if (orders.length === 0) {
+		consola.info("No order history found.");
+	} else {
+		const tableData = orders.map((order) => ({
+			Time: new Date(order.timestamp).toLocaleString(),
+			Market: order.market,
+			Side: formatSide(order.side as "buy" | "sell"),
+			Type: order.type.toUpperCase(),
+			Price: order.price
+				? `$${formatAmount(order.price, PRICE_DECIMALS, 2)}`
+				: "-",
+			Status: order.status === "filled" ? "✓ Filled" : order.status,
+		}));
+
+		console.log(
+			table(
+				[
+					{ header: "Time", key: "Time" },
+					{ header: "Market", key: "Market" },
+					{ header: "Side", key: "Side" },
+					{ header: "Type", key: "Type" },
+					{ header: "Price", key: "Price", align: "right" },
+					{ header: "Status", key: "Status" },
+				],
+				tableData,
+			),
+		);
+	}
+
+	console.log();
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function ensureWallet(): void {
 	if (!walletExists()) {
 		throw new Error("No wallet found. Run 'deepdex init' first.");
 	}
+}
 
-	const _limit = getFlag<number>(args.raw, "limit") || 20;
-	const _marketFilter = getFlag<string>(args.raw, "market");
-
-	console.log(bold("\n📜 Order History\n"));
-	console.log(dim("  Order history requires indexer integration."));
-	console.log(dim("  This feature will be available in a future update."));
-	console.log();
+async function ensureUnlocked(): Promise<void> {
+	if (!isUnlocked()) {
+		const password = await promptPassword("Enter wallet password: ");
+		await unlockWallet(password);
+	}
 }

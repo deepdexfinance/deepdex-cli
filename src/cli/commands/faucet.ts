@@ -2,10 +2,10 @@
  * Faucet command - Mint testnet tokens
  */
 
+import { consola } from "consola";
 import { network } from "../../abis/config.ts";
 import { getStoredAddress, walletExists } from "../../services/wallet.ts";
-import { bold, dim, info, success } from "../../utils/format.ts";
-import { spinner } from "../../utils/ui.ts";
+import { dim } from "../../utils/format.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag } from "../parser.ts";
 
@@ -29,10 +29,18 @@ export async function run(args: ParsedArgs): Promise<void> {
 	}
 
 	console.log();
-	console.log(bold("🚰 DeepDex Testnet Faucet\n"));
+	consola.box({
+		title: "🚰 DeepDex Testnet Faucet",
+		message: `Minting ${token} tokens to your wallet`,
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
 
-	const spin = spinner(`Requesting ${token} from faucet...`);
-	spin.start();
+	console.log();
+	consola.start(`Requesting ${token} from faucet...`);
 
 	// Simulate faucet delay
 	await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -46,7 +54,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 		SOL: "100",
 	};
 
-	spin.stop(success(`Received ${amounts[token]} ${token}!`));
+	consola.success(`Received ${amounts[token]} ${token}!`);
 
 	console.log();
 	console.log(`${dim("  Recipient:")} ${address}`);
@@ -63,7 +71,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 	}
 
 	console.log();
-	console.log(info("Tokens will appear in your wallet shortly."));
+	consola.info("Tokens will appear in your wallet shortly.");
 
 	if (token === "USDC") {
 		console.log(dim("  Next step: deepdex account deposit 1000 USDC"));

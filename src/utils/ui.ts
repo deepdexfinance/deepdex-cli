@@ -1,10 +1,21 @@
 /**
- * CLI UI utilities for DeepDex
+ * CLI UI utilities for DeepDex - powered by consola
  */
 
 import * as readline from "node:readline";
-import { COLORS, SYMBOLS } from "./constants.ts";
+import { consola, createConsola } from "consola";
+import { SYMBOLS } from "./constants.ts";
 import { bold, dim } from "./format.ts";
+
+// Create a custom consola instance for DeepDex
+export const logger = createConsola({
+	fancy: true,
+	formatOptions: {
+		colors: true,
+		compact: false,
+		date: false,
+	},
+});
 
 // ============================================================================
 // Table Rendering
@@ -36,9 +47,6 @@ export function table(
 		);
 		return col.width || Math.max(headerLen, maxDataLen, 4);
 	});
-
-	const _totalWidth =
-		widths.reduce((a, b) => a + b, 0) + columns.length * 3 + 1;
 
 	// Build table
 	const lines: string[] = [];
@@ -205,14 +213,16 @@ export async function promptPassword(message: string): Promise<string> {
 			const c = char.toString("utf8");
 			if (c === "\n" || c === "\r" || c === "\u0004") {
 				stdin.removeListener("data", onData);
-			} else {
-				process.stdout.clearLine(0);
-				process.stdout.cursorTo(0);
+			} else if (process.stdout.isTTY) {
+				process.stdout.clearLine?.(0);
+				process.stdout.cursorTo?.(0);
 				process.stdout.write(message + "*".repeat(rl.line.length + 1));
 			}
 		};
 
-		stdin.on("data", onData);
+		if (process.stdin.isTTY) {
+			stdin.on("data", onData);
+		}
 
 		rl.question(message, (answer) => {
 			rl.close();
@@ -245,50 +255,44 @@ export async function select(
 }
 
 // ============================================================================
-// Progress & Spinners
+// Progress & Spinners (using consola)
 // ============================================================================
 
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
 /**
- * Create a spinner for loading states
+ * Create a spinner for loading states using consola
  */
 export function spinner(message: string) {
-	let frameIndex = 0;
-	let interval: ReturnType<typeof setInterval> | null = null;
-	const isTTY = process.stdout.isTTY;
+	let isRunning = false;
 
 	return {
 		start() {
-			if (!isTTY) {
-				// Non-interactive mode - just print the message
-				console.log(`${SYMBOLS.pending} ${message}`);
-				return;
-			}
-			interval = setInterval(() => {
-				const frame = SPINNER_FRAMES[frameIndex % SPINNER_FRAMES.length];
-				process.stdout.write(
-					`\r${COLORS.info}${frame}${COLORS.reset} ${message}`,
-				);
-				frameIndex++;
-			}, 80);
+			isRunning = true;
+			consola.start(message);
 		},
 		stop(finalMessage?: string) {
-			if (interval) {
-				clearInterval(interval);
-				if (isTTY && typeof process.stdout.clearLine === "function") {
-					process.stdout.clearLine(0);
-					process.stdout.cursorTo(0);
-				} else {
-					process.stdout.write("\n");
+			if (isRunning) {
+				isRunning = false;
+				if (finalMessage) {
+					// Use stripAnsi to clean the message
+					const cleanMessage = stripAnsi(finalMessage);
+					// Parse the message to determine type
+					if (cleanMessage.includes("✓") || cleanMessage.includes("success")) {
+						consola.success(cleanMessage.replace(/^.*?✓\s*/, ""));
+					} else if (
+						cleanMessage.includes("✗") ||
+						cleanMessage.includes("error")
+					) {
+						consola.error(cleanMessage.replace(/^.*?✗\s*/, ""));
+					} else if (cleanMessage.trim()) {
+						consola.info(cleanMessage);
+					}
 				}
-			}
-			if (finalMessage) {
-				console.log(finalMessage);
 			}
 		},
 		update(newMessage: string) {
-			message = newMessage;
+			if (isRunning) {
+				consola.start(newMessage);
+			}
 		},
 	};
 }

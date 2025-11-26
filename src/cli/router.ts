@@ -2,144 +2,55 @@
  * Command router for DeepDex CLI
  */
 
-import { error } from "../utils/format.ts";
-import * as accountCmd from "./commands/account.ts";
-import * as balanceCmd from "./commands/balance.ts";
-import * as botCmd from "./commands/bot.ts";
-import * as configCmd from "./commands/config.ts";
-import * as faucetCmd from "./commands/faucet.ts";
-import * as healthCmd from "./commands/health.ts";
-import * as historyCmd from "./commands/history.ts";
-// Import command handlers
-import * as initCmd from "./commands/init.ts";
-import * as marketCmd from "./commands/market.ts";
-import * as orderCmd from "./commands/order.ts";
-import * as perpCmd from "./commands/perp.ts";
-import * as positionCmd from "./commands/position.ts";
-import * as spotCmd from "./commands/spot.ts";
-import * as walletCmd from "./commands/wallet.ts";
+import { consola } from "consola";
+// Import command modules
+import * as account from "./commands/account.ts";
+import * as balance from "./commands/balance.ts";
+import * as bot from "./commands/bot.ts";
+import * as config from "./commands/config.ts";
+import * as faucet from "./commands/faucet.ts";
+import * as health from "./commands/health.ts";
+import * as history from "./commands/history.ts";
+import * as init from "./commands/init.ts";
+import * as market from "./commands/market.ts";
+import * as order from "./commands/order.ts";
+import * as perp from "./commands/perp.ts";
+import * as position from "./commands/position.ts";
+import * as spot from "./commands/spot.ts";
+import * as wallet from "./commands/wallet.ts";
 import { shouldShowHelp, showCommandHelp, showMainHelp } from "./help.ts";
 import type { ParsedArgs } from "./parser.ts";
 
 // ============================================================================
-// Route Definitions
+// Command Aliases
 // ============================================================================
 
-type CommandHandler = (args: ParsedArgs) => Promise<void>;
-
-const routes: Record<string, CommandHandler> = {
-	// Setup
-	init: initCmd.run,
-	quickstart: initCmd.quickstart,
-
-	// Wallet
-	"wallet info": walletCmd.info,
-	"wallet export": walletCmd.exportKey,
-	"wallet import": walletCmd.importKey,
-	"wallet sign": walletCmd.sign,
-
-	// Account
-	"account create": accountCmd.create,
-	"account list": accountCmd.list,
-	"account info": accountCmd.info,
-	"account deposit": accountCmd.deposit,
-	"account withdraw": accountCmd.withdraw,
-	"account delegate": accountCmd.delegate,
-
-	// Faucet
-	faucet: faucetCmd.run,
-
-	// Market
-	"market list": marketCmd.list,
-	"market info": marketCmd.info,
-	"market price": marketCmd.price,
-	"market orderbook": marketCmd.orderbook,
-	"market trades": marketCmd.trades,
-	"market funding": marketCmd.funding,
-
-	// Balance & Portfolio
-	balance: balanceCmd.run,
-	portfolio: balanceCmd.portfolio,
-
-	// Spot Trading
-	"spot buy": spotCmd.buy,
-	"spot sell": spotCmd.sell,
-
-	// Perp Trading
-	"perp long": perpCmd.long,
-	"perp short": perpCmd.short,
-
-	// Order Management
-	"order list": orderCmd.list,
-	"order cancel": orderCmd.cancel,
-	"order cancel-all": orderCmd.cancelAll,
-	"order history": orderCmd.history,
-
-	// Position Management
-	"position list": positionCmd.list,
-	"position info": positionCmd.info,
-	"position close": positionCmd.close,
-	"position modify": positionCmd.modify,
-
-	// Bot
-	"bot start": botCmd.start,
-	"bot stop": botCmd.stop,
-	"bot status": botCmd.status,
-	"bot logs": botCmd.logs,
-	"bot list-strategies": botCmd.listStrategies,
-
-	// Config
-	"config show": configCmd.show,
-	"config set": configCmd.set,
-	"config reset": configCmd.reset,
-
-	// Health
-	health: healthCmd.run,
-
-	// History
-	"history trades": historyCmd.trades,
-	"history transfers": historyCmd.transfers,
+const ALIASES: Record<string, string[]> = {
+	buy: ["spot", "buy"],
+	sell: ["spot", "sell"],
+	long: ["perp", "long"],
+	short: ["perp", "short"],
+	portfolio: ["balance", "portfolio"],
 };
-
-// Aliases
-const aliases: Record<string, string> = {
-	buy: "spot buy",
-	sell: "spot sell",
-	long: "perp long",
-	short: "perp short",
-};
-
-// Parent commands that need subcommands
-const parentCommands = new Set([
-	"wallet",
-	"account",
-	"market",
-	"spot",
-	"perp",
-	"order",
-	"position",
-	"bot",
-	"config",
-	"history",
-]);
 
 // ============================================================================
 // Router
 // ============================================================================
 
 /**
- * Route command to appropriate handler
+ * Route parsed arguments to the appropriate command handler
  */
 export async function route(args: ParsedArgs): Promise<void> {
-	const { command, raw } = args;
+	// Expand aliases
+	const command = expandAlias(args.command);
 
-	// No command - show main help
-	if (command.length === 0) {
+	// Handle empty command
+	if (command.length === 0 || (command.length === 1 && command[0] === "")) {
 		showMainHelp();
 		return;
 	}
 
-	// Help command
+	// Handle help command
 	if (command[0] === "help") {
 		if (command.length > 1) {
 			showCommandHelp(command.slice(1));
@@ -149,49 +60,299 @@ export async function route(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	// Check for --help flag
-	if (shouldShowHelp(raw)) {
+	// Handle --help flag on any command
+	if (shouldShowHelp(args.raw)) {
 		showCommandHelp(command);
 		return;
 	}
 
-	// Build command key
-	let commandKey = command.join(" ");
+	// Route to command handler
+	const [primary, secondary] = command;
 
-	// Check aliases
-	if (aliases[commandKey]) {
-		commandKey = aliases[commandKey];
-		// Parse aliased command
-		const aliasParts = commandKey.split(" ");
-		args.command = aliasParts;
-	}
+	switch (primary) {
+		// Setup
+		case "init":
+			await init.run(args);
+			break;
+		case "quickstart":
+			await init.quickstart(args);
+			break;
 
-	// Check if it's a parent command without subcommand
-	if (parentCommands.has(commandKey)) {
-		showCommandHelp([commandKey]);
-		return;
-	}
+		// Wallet
+		case "wallet":
+			await routeWallet(secondary, args);
+			break;
 
-	// Find handler
-	const handler = routes[commandKey];
+		// Account
+		case "account":
+			await routeAccount(secondary, args);
+			break;
 
-	if (!handler) {
-		console.log(error(`Unknown command: ${commandKey}`));
-		console.log(`Run 'deepdex help' for available commands.`);
-		process.exit(1);
-	}
+		// Faucet
+		case "faucet":
+			await faucet.run(args);
+			break;
 
-	try {
-		await handler(args);
-	} catch (err) {
-		if (err instanceof Error) {
-			console.log(error(err.message));
-			if (args.flags.verbose) {
-				console.error(err.stack);
+		// Balance & Portfolio
+		case "balance":
+			if (secondary === "portfolio") {
+				await balance.portfolio(args);
+			} else {
+				await balance.run(args);
 			}
-		} else {
-			console.log(error(String(err)));
-		}
-		process.exit(1);
+			break;
+		case "portfolio":
+			await balance.portfolio(args);
+			break;
+
+		// Market
+		case "market":
+			await routeMarket(secondary, args);
+			break;
+
+		// Trading
+		case "spot":
+			await routeSpot(secondary, args);
+			break;
+		case "perp":
+			await routePerp(secondary, args);
+			break;
+
+		// Orders & Positions
+		case "order":
+			await routeOrder(secondary, args);
+			break;
+		case "position":
+			await routePosition(secondary, args);
+			break;
+
+		// Bot
+		case "bot":
+			await routeBot(secondary, args);
+			break;
+
+		// Config
+		case "config":
+			await routeConfig(secondary, args);
+			break;
+
+		// History
+		case "history":
+			await history.run(args);
+			break;
+
+		// Health
+		case "health":
+			await health.run(args);
+			break;
+
+		default:
+			consola.error(`Unknown command: ${primary}`);
+			consola.info("Run 'deepdex help' for available commands.");
+			process.exit(1);
 	}
+}
+
+// ============================================================================
+// Sub-routers
+// ============================================================================
+
+async function routeWallet(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "info":
+		case undefined:
+			await wallet.info(args);
+			break;
+		case "export":
+			await wallet.exportKey(args);
+			break;
+		case "import":
+			await wallet.importKey(args);
+			break;
+		case "sign":
+			await wallet.sign(args);
+			break;
+		default:
+			throw new Error(`Unknown wallet command: ${subcommand}`);
+	}
+}
+
+async function routeAccount(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "create":
+			await account.create(args);
+			break;
+		case "list":
+		case undefined:
+			await account.list(args);
+			break;
+		case "info":
+			await account.info(args);
+			break;
+		case "deposit":
+			await account.deposit(args);
+			break;
+		case "withdraw":
+			await account.withdraw(args);
+			break;
+		case "delegate":
+			await account.delegate(args);
+			break;
+		default:
+			throw new Error(`Unknown account command: ${subcommand}`);
+	}
+}
+
+async function routeMarket(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "list":
+		case undefined:
+			await market.list(args);
+			break;
+		case "info":
+			await market.info(args);
+			break;
+		case "price":
+			await market.price(args);
+			break;
+		case "orderbook":
+			await market.orderbook(args);
+			break;
+		case "trades":
+			await market.trades(args);
+			break;
+		case "funding":
+			await market.funding(args);
+			break;
+		default:
+			throw new Error(`Unknown market command: ${subcommand}`);
+	}
+}
+
+async function routeSpot(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "buy":
+			await spot.buy(args);
+			break;
+		case "sell":
+			await spot.sell(args);
+			break;
+		default:
+			throw new Error(
+				`Unknown spot command: ${subcommand}. Use 'buy' or 'sell'.`,
+			);
+	}
+}
+
+async function routePerp(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "long":
+			await perp.long(args);
+			break;
+		case "short":
+			await perp.short(args);
+			break;
+		default:
+			throw new Error(
+				`Unknown perp command: ${subcommand}. Use 'long' or 'short'.`,
+			);
+	}
+}
+
+async function routeOrder(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "list":
+		case undefined:
+			await order.list(args);
+			break;
+		case "cancel":
+			await order.cancel(args);
+			break;
+		case "cancel-all":
+			await order.cancelAll(args);
+			break;
+		case "history":
+			await order.history(args);
+			break;
+		default:
+			throw new Error(`Unknown order command: ${subcommand}`);
+	}
+}
+
+async function routePosition(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "list":
+		case undefined:
+			await position.list(args);
+			break;
+		case "info":
+			await position.info(args);
+			break;
+		case "close":
+			await position.close(args);
+			break;
+		case "modify":
+			await position.modify(args);
+			break;
+		default:
+			throw new Error(`Unknown position command: ${subcommand}`);
+	}
+}
+
+async function routeBot(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "start":
+			await bot.start(args);
+			break;
+		case "stop":
+			await bot.stop(args);
+			break;
+		case "status":
+		case undefined:
+			await bot.status(args);
+			break;
+		case "logs":
+			await bot.logs(args);
+			break;
+		case "list-strategies":
+			await bot.listStrategies(args);
+			break;
+		default:
+			throw new Error(`Unknown bot command: ${subcommand}`);
+	}
+}
+
+async function routeConfig(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "show":
+		case undefined:
+			await config.show(args);
+			break;
+		case "set":
+			await config.set(args);
+			break;
+		case "reset":
+			await config.reset(args);
+			break;
+		default:
+			throw new Error(`Unknown config command: ${subcommand}`);
+	}
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Expand command aliases
+ */
+function expandAlias(command: string[]): string[] {
+	if (command.length === 0) return command;
+
+	const first = command[0];
+	if (first && ALIASES[first]) {
+		return [...ALIASES[first], ...command.slice(1)];
+	}
+
+	return command;
 }

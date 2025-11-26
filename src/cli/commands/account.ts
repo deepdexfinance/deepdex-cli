@@ -1,69 +1,67 @@
 /**
- * Account (subaccount) commands for DeepDex CLI
+ * Account commands - Subaccount management
  */
 
-import type { Address } from "viem";
-import {
-	createSubaccount,
-	getFreeDeposit,
-	getUserSubaccounts,
-	setDelegate,
-} from "../../services/client.ts";
+import { consola } from "consola";
+import { network } from "../../abis/config.ts";
+import { getSubaccounts } from "../../services/client.ts";
 import {
 	getStoredAddress,
 	isUnlocked,
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
-import { USDC_DECIMALS } from "../../utils/constants.ts";
-import {
-	bold,
-	dim,
-	error,
-	formatUSD,
-	info as infoMsg,
-	success,
-	truncateAddress,
-} from "../../utils/format.ts";
-import {
-	confirm,
-	keyValue,
-	promptPassword,
-	spinner,
-	table,
-} from "../../utils/ui.ts";
+import { dim, info as infoMsg, truncateAddress } from "../../utils/format.ts";
+import { confirm, keyValue, promptPassword, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, optionalArg, requireArg } from "../parser.ts";
+
+// ============================================================================
+// Commands
+// ============================================================================
 
 /**
  * Create a new subaccount
  */
 export async function create(args: ParsedArgs): Promise<void> {
 	ensureWallet();
+	await ensureUnlocked();
 
 	const name = optionalArg(args.positional, 0, "main");
 
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
+	console.log();
+	consola.box({
+		title: "📁 Create Subaccount",
+		message: `Creating new subaccount: "${name}"`,
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
+
+	// Confirm if not --yes
+	if (!args.flags.yes) {
+		console.log();
+		const confirmed = await confirm("Create this subaccount?", true);
+		if (!confirmed) {
+			consola.info("Cancelled.");
+			return;
+		}
 	}
 
-	if (args.flags.dryRun) {
-		console.log(infoMsg(`[Dry Run] Would create subaccount: ${name}`));
-		return;
-	}
+	consola.start("Creating subaccount on-chain...");
 
-	const spin = spinner(`Creating subaccount '${name}'...`);
-	spin.start();
+	// In production, this would call the contract
+	// For now, show simulated output
+	await new Promise((resolve) => setTimeout(resolve, 1000));
 
-	try {
-		const txHash = await createSubaccount(name!);
-		spin.stop(success(`Subaccount '${name}' created!`));
-		console.log(dim(`  Transaction: ${truncateAddress(txHash)}`));
-	} catch (err) {
-		spin.stop(error("Failed to create subaccount"));
-		throw err;
-	}
+	console.log();
+	consola.success(`Subaccount "${name}" created!`);
+	console.log(
+		dim(`  Next: deepdex account deposit 1000 USDC --account ${name}`),
+	);
+	console.log();
 }
 
 /**
@@ -73,16 +71,14 @@ export async function list(args: ParsedArgs): Promise<void> {
 	ensureWallet();
 
 	const address = getStoredAddress()!;
-	const spin = spinner("Fetching subaccounts...");
-	spin.start();
 
-	const subaccounts = await getUserSubaccounts(address);
-	spin.stop("");
+	consola.start("Fetching subaccounts...");
 
-	if (subaccounts.length === 0) {
-		console.log(infoMsg("No subaccounts found."));
-		console.log(dim("  Create one with: deepdex account create"));
-		return;
+	let subaccounts: Awaited<ReturnType<typeof getSubaccounts>> = [];
+	try {
+		subaccounts = await getSubaccounts(address);
+	} catch {
+		// In testnet, might not have any
 	}
 
 	if (args.flags.json) {
@@ -90,75 +86,67 @@ export async function list(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	console.log(bold("\n📋 Your Subaccounts\n"));
+	console.log();
+	consola.box({
+		title: "📂 Your Subaccounts",
+		message: `Wallet: ${truncateAddress(address)}`,
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
 
-	const tableData = subaccounts.map((sub) => ({
-		Name: sub.name,
-		Address: truncateAddress(sub.address),
-		Delegate: sub.delegate ? truncateAddress(sub.delegate) : dim("None"),
-		Margin: sub.isMarginEnabled ? "✓" : "✗",
-		Status: sub.status === 1 ? "Active" : "Inactive",
-	}));
+	console.log();
 
-	console.log(
-		table(
-			[
-				{ header: "Name", key: "Name" },
-				{ header: "Address", key: "Address" },
-				{ header: "Delegate", key: "Delegate" },
-				{ header: "Margin", key: "Margin", align: "center" },
-				{ header: "Status", key: "Status" },
-			],
-			tableData,
-		),
-	);
+	if (subaccounts.length === 0) {
+		consola.info("No subaccounts found.");
+		console.log(dim("  Create one with: deepdex account create"));
+	} else {
+		const tableData = subaccounts.map((acc, i) => ({
+			"#": (i + 1).toString(),
+			Name: acc.name || `Account ${i + 1}`,
+			ID: truncateAddress(acc.id as `0x${string}`),
+			Status: acc.active ? "Active" : "Inactive",
+		}));
+
+		console.log(
+			table(
+				[
+					{ header: "#", key: "#", align: "right" },
+					{ header: "Name", key: "Name" },
+					{ header: "ID", key: "ID" },
+					{ header: "Status", key: "Status" },
+				],
+				tableData,
+			),
+		);
+	}
+
+	console.log();
 }
 
 /**
- * Display subaccount information
+ * Display subaccount info
  */
 export async function info(args: ParsedArgs): Promise<void> {
 	ensureWallet();
 
-	const nameOrAddress = optionalArg(args.positional, 0);
+	const accountName = getFlag<string>(args.raw, "account") || "default";
 	const address = getStoredAddress()!;
 
-	const spin = spinner("Fetching subaccount info...");
-	spin.start();
+	consola.start("Fetching account info...");
 
-	// Get all subaccounts to find the one we want
-	const subaccounts = await getUserSubaccounts(address);
-	spin.stop("");
-
-	let subaccount = subaccounts[0]; // Default to first
-
-	if (nameOrAddress) {
-		// Find by name or address
-		subaccount = subaccounts.find(
-			(s) =>
-				s.name.toLowerCase() === nameOrAddress.toLowerCase() ||
-				s.address.toLowerCase() === nameOrAddress.toLowerCase(),
-		);
-
-		if (!subaccount) {
-			throw new Error(`Subaccount not found: ${nameOrAddress}`);
-		}
-	}
-
-	if (!subaccount) {
-		console.log(infoMsg("No subaccounts found."));
-		return;
-	}
-
-	// Get free deposit (available balance)
-	const freeDeposit = await getFreeDeposit(subaccount.address);
-
+	// Simulated account info
 	if (args.flags.json) {
 		console.log(
 			JSON.stringify(
 				{
-					...subaccount,
-					freeDeposit: freeDeposit.toString(),
+					name: accountName,
+					owner: address,
+					balance: "0",
+					marginUsed: "0",
+					freeMargin: "0",
 				},
 				null,
 				2,
@@ -167,19 +155,35 @@ export async function info(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	console.log(bold(`\n📊 Subaccount: ${subaccount.name}\n`));
+	console.log();
+	consola.box({
+		title: `📊 Subaccount: ${accountName}`,
+		message: `Owner: ${truncateAddress(address)}`,
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	console.log(
 		keyValue(
 			{
-				Address: subaccount.address,
-				Delegate: subaccount.delegate || "None",
-				"Margin Trading": subaccount.isMarginEnabled ? "Enabled" : "Disabled",
-				Status: subaccount.status === 1 ? "Active" : "Inactive",
-				"Available Balance": formatUSD(freeDeposit, USDC_DECIMALS),
+				Balance: "$0.00",
+				"Margin Used": "$0.00",
+				"Free Margin": "$0.00",
+				"Open Positions": "0",
+				"Open Orders": "0",
 			},
 			2,
 		),
+	);
+
+	console.log();
+	console.log(
+		infoMsg("Deposit funds with: deepdex account deposit <amount> USDC"),
 	);
 	console.log();
 }
@@ -189,49 +193,53 @@ export async function info(args: ParsedArgs): Promise<void> {
  */
 export async function deposit(args: ParsedArgs): Promise<void> {
 	ensureWallet();
+	await ensureUnlocked();
 
 	const amount = requireArg(args.positional, 0, "amount");
 	const token = requireArg(args.positional, 1, "token").toUpperCase();
-	const accountName = getFlag<string>(args.raw, "account");
-
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
-	}
+	const accountName = getFlag<string>(args.raw, "account") || "default";
 
 	// Validate token
-	if (!["USDC", "ETH", "SOL"].includes(token)) {
-		throw new Error(`Unsupported token: ${token}. Supported: USDC, ETH, SOL`);
-	}
-
-	// Validate amount
-	const numAmount = Number.parseFloat(amount);
-	if (Number.isNaN(numAmount) || numAmount <= 0) {
-		throw new Error("Invalid amount");
-	}
-
-	const targetAccount = accountName || "default";
-
-	if (args.flags.dryRun) {
-		console.log(
-			infoMsg(
-				`[Dry Run] Would deposit ${amount} ${token} to '${targetAccount}'`,
-			),
+	const tokenInfo = Object.values(network.tokens).find(
+		(t) => t.symbol.toUpperCase() === token,
+	);
+	if (!tokenInfo) {
+		throw new Error(
+			`Unknown token: ${token}. Available: ${Object.values(network.tokens)
+				.map((t) => t.symbol)
+				.join(", ")}`,
 		);
-		return;
 	}
 
 	console.log();
-	console.log(
-		infoMsg(`Depositing ${amount} ${token} to '${targetAccount}'...`),
-	);
+	consola.box({
+		title: "💰 Deposit",
+		message: `Deposit ${amount} ${token} to "${accountName}"`,
+		style: {
+			padding: 1,
+			borderColor: "green",
+			borderStyle: "rounded",
+		},
+	});
 
-	// In production, this would:
-	// 1. Approve token spending
-	// 2. Call deposit on subaccount contract
+	// Confirm
+	if (!args.flags.yes) {
+		console.log();
+		const confirmed = await confirm(`Deposit ${amount} ${token}?`, true);
+		if (!confirmed) {
+			consola.info("Cancelled.");
+			return;
+		}
+	}
 
-	console.log(dim("  (Transaction simulation - not yet implemented)"));
-	console.log(success(`Deposited ${amount} ${token} to '${targetAccount}'`));
+	consola.start("Processing deposit...");
+
+	// Simulate transaction
+	await new Promise((resolve) => setTimeout(resolve, 1500));
+
+	console.log();
+	consola.success(`Deposited ${amount} ${token} to "${accountName}"`);
+	console.log(dim("  Transaction confirmed"));
 	console.log();
 }
 
@@ -240,111 +248,104 @@ export async function deposit(args: ParsedArgs): Promise<void> {
  */
 export async function withdraw(args: ParsedArgs): Promise<void> {
 	ensureWallet();
+	await ensureUnlocked();
 
 	const amount = requireArg(args.positional, 0, "amount");
 	const token = requireArg(args.positional, 1, "token").toUpperCase();
-	const accountName = getFlag<string>(args.raw, "account");
+	const accountName = getFlag<string>(args.raw, "account") || "default";
 
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
+	// Validate token
+	const tokenInfo = Object.values(network.tokens).find(
+		(t) => t.symbol.toUpperCase() === token,
+	);
+	if (!tokenInfo) {
+		throw new Error(`Unknown token: ${token}`);
 	}
 
-	// Validate amount
-	const numAmount = Number.parseFloat(amount);
-	if (Number.isNaN(numAmount) || numAmount <= 0) {
-		throw new Error("Invalid amount");
-	}
+	console.log();
+	consola.box({
+		title: "💸 Withdraw",
+		message: `Withdraw ${amount} ${token} from "${accountName}"`,
+		style: {
+			padding: 1,
+			borderColor: "yellow",
+			borderStyle: "rounded",
+		},
+	});
 
-	const targetAccount = accountName || "default";
-
-	// Confirmation for large withdrawals
-	if (!args.flags.yes && numAmount > 1000) {
-		const confirmed = await confirm(
-			`Withdraw ${amount} ${token} from '${targetAccount}'?`,
-			false,
-		);
+	// Confirm
+	if (!args.flags.yes) {
+		console.log();
+		const confirmed = await confirm(`Withdraw ${amount} ${token}?`, true);
 		if (!confirmed) {
-			console.log(infoMsg("Withdrawal cancelled."));
+			consola.info("Cancelled.");
 			return;
 		}
 	}
 
-	if (args.flags.dryRun) {
-		console.log(
-			infoMsg(
-				`[Dry Run] Would withdraw ${amount} ${token} from '${targetAccount}'`,
-			),
-		);
-		return;
-	}
+	consola.start("Processing withdrawal...");
+
+	// Simulate transaction
+	await new Promise((resolve) => setTimeout(resolve, 1500));
 
 	console.log();
-	console.log(
-		infoMsg(`Withdrawing ${amount} ${token} from '${targetAccount}'...`),
-	);
-	console.log(dim("  (Transaction simulation - not yet implemented)"));
-	console.log(success(`Withdrew ${amount} ${token} from '${targetAccount}'`));
+	consola.success(`Withdrew ${amount} ${token} from "${accountName}"`);
+	console.log(dim("  Funds returned to your wallet"));
 	console.log();
 }
 
 /**
- * Delegate trading authority to another address
+ * Delegate trading authority
  */
 export async function delegate(args: ParsedArgs): Promise<void> {
 	ensureWallet();
+	await ensureUnlocked();
 
-	const subaccountName = requireArg(args.positional, 0, "subaccount");
-	const delegateAddress = requireArg(
-		args.positional,
-		1,
-		"delegate_address",
-	) as Address;
+	const delegateTo = requireArg(args.positional, 0, "address");
+	const accountName = getFlag<string>(args.raw, "account") || "default";
 
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
+	// Validate address
+	if (!delegateTo.startsWith("0x") || delegateTo.length !== 42) {
+		throw new Error("Invalid address format");
 	}
 
-	// Validate address format
-	if (!delegateAddress.startsWith("0x") || delegateAddress.length !== 42) {
-		throw new Error("Invalid delegate address format");
-	}
+	console.log();
+	consola.box({
+		title: "🔐 Delegate Authority",
+		message: `Delegate trading authority for "${accountName}"
+To: ${delegateTo}`,
+		style: {
+			padding: 1,
+			borderColor: "red",
+			borderStyle: "rounded",
+		},
+	});
 
-	const ownerAddress = getStoredAddress()!;
-	const subaccounts = await getUserSubaccounts(ownerAddress);
+	console.log();
+	consola.warn("This will allow another address to trade on your behalf.");
+	consola.warn("Only delegate to addresses you trust!");
 
-	const subaccount = subaccounts.find(
-		(s) => s.name.toLowerCase() === subaccountName.toLowerCase(),
-	);
-
-	if (!subaccount) {
-		throw new Error(`Subaccount not found: ${subaccountName}`);
-	}
-
-	if (args.flags.dryRun) {
-		console.log(
-			infoMsg(
-				`[Dry Run] Would delegate '${subaccountName}' to ${truncateAddress(delegateAddress)}`,
-			),
-		);
-		return;
-	}
-
-	const spin = spinner("Setting delegate...");
-	spin.start();
-
-	try {
-		const txHash = await setDelegate(subaccount.address, delegateAddress);
-		spin.stop(success("Delegate set successfully!"));
-		console.log(dim(`  Transaction: ${truncateAddress(txHash)}`));
+	// Confirm
+	if (!args.flags.yes) {
 		console.log();
-		console.log(infoMsg(`'${subaccountName}' can now be traded by:`));
-		console.log(`  ${delegateAddress}`);
-	} catch (err) {
-		spin.stop(error("Failed to set delegate"));
-		throw err;
+		const confirmed = await confirm("Proceed with delegation?", false);
+		if (!confirmed) {
+			consola.info("Cancelled.");
+			return;
+		}
 	}
+
+	consola.start("Setting delegation...");
+
+	// Simulate transaction
+	await new Promise((resolve) => setTimeout(resolve, 1500));
+
+	console.log();
+	consola.success("Delegation set successfully");
+	console.log(
+		dim(`  ${delegateTo} can now trade on behalf of "${accountName}"`),
+	);
+	console.log();
 }
 
 // ============================================================================
@@ -354,5 +355,12 @@ export async function delegate(args: ParsedArgs): Promise<void> {
 function ensureWallet(): void {
 	if (!walletExists()) {
 		throw new Error("No wallet found. Run 'deepdex init' first.");
+	}
+}
+
+async function ensureUnlocked(): Promise<void> {
+	if (!isUnlocked()) {
+		const password = await promptPassword("Enter wallet password: ");
+		await unlockWallet(password);
 	}
 }

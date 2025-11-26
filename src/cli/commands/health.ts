@@ -3,6 +3,7 @@
  */
 
 import { existsSync, statSync } from "node:fs";
+import { consola } from "consola";
 import {
 	getBalance,
 	getBlockNumber,
@@ -15,13 +16,8 @@ import type {
 	HealthStatus,
 } from "../../types/index.ts";
 import { BOT_PID_PATH, DEEPDEX_HOME } from "../../utils/constants.ts";
-import {
-	bold,
-	dim,
-	formatAmount,
-	formatHealthStatus,
-} from "../../utils/format.ts";
-import { spinner, table } from "../../utils/ui.ts";
+import { formatAmount, formatHealthStatus } from "../../utils/format.ts";
+import { table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag } from "../parser.ts";
 
@@ -34,7 +30,6 @@ export async function run(args: ParsedArgs): Promise<void> {
 
 	const runChecks = async (): Promise<HealthReport> => {
 		const checks: HealthCheck[] = [];
-		const _startTime = Date.now();
 
 		// 1. RPC Connection
 		try {
@@ -121,7 +116,6 @@ export async function run(args: ParsedArgs): Promise<void> {
 				const state = JSON.parse(
 					require("node:fs").readFileSync(BOT_PID_PATH, "utf8"),
 				);
-				const _uptime = Date.now() - state.startedAt;
 
 				checks.push({
 					component: "Bot Process",
@@ -146,9 +140,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 		// 5. Disk Space
 		try {
 			if (existsSync(DEEPDEX_HOME)) {
-				const _stats = statSync(DEEPDEX_HOME);
-				// Note: This is a simplified check
-				// In production, use os.freemem() or df command
+				statSync(DEEPDEX_HOME);
 				checks.push({
 					component: "Disk Space",
 					status: "ok",
@@ -195,12 +187,11 @@ export async function run(args: ParsedArgs): Promise<void> {
 	};
 
 	// Run checks
-	const spin = !quiet && !watch ? spinner("Running health checks...") : null;
-	spin?.start();
+	if (!quiet && !watch) {
+		consola.start("Running health checks...");
+	}
 
 	const report = await runChecks();
-
-	spin?.stop("");
 
 	// Output
 	if (args.flags.json) {
@@ -219,7 +210,23 @@ export async function run(args: ParsedArgs): Promise<void> {
 	}
 
 	// Display results
-	console.log(bold("\n🏥 DeepDex Health Check\n"));
+	console.log();
+	consola.box({
+		title: "🏥 DeepDex Health Check",
+		message: "System diagnostics and status",
+		style: {
+			padding: 1,
+			borderColor:
+				report.overall === "ok"
+					? "green"
+					: report.overall === "warning"
+						? "yellow"
+						: "red",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	const tableData = report.checks.map((check) => ({
 		Component: check.component,
@@ -239,15 +246,16 @@ export async function run(args: ParsedArgs): Promise<void> {
 	);
 
 	console.log();
-	console.log(
-		`Overall: ${formatHealthStatus(report.overall)} ${
-			report.overall === "ok"
-				? "All systems operational"
-				: report.overall === "warning"
-					? "Some warnings detected"
-					: "Critical issues detected"
-		}`,
-	);
+
+	// Overall status with consola
+	if (report.overall === "ok") {
+		consola.success("All systems operational");
+	} else if (report.overall === "warning") {
+		consola.warn("Some warnings detected");
+	} else {
+		consola.error("Critical issues detected");
+	}
+
 	console.log();
 
 	// Set exit code
@@ -256,7 +264,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 
 	// Watch mode
 	if (watch) {
-		console.log(dim("Watching for changes... (Ctrl+C to stop)\n"));
+		consola.info("Watching for changes... (Ctrl+C to stop)");
 		// In production, this would poll periodically
 	}
 }

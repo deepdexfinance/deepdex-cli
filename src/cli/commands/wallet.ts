@@ -1,32 +1,24 @@
 /**
- * Wallet commands for DeepDex CLI
+ * Wallet commands - Wallet management for DeepDex
  */
 
+import { consola } from "consola";
 import { getBalance, getNonce } from "../../services/client.ts";
 import {
-	getPrivateKey,
+	exportPrivateKey,
 	getStoredAddress,
-	getWalletCreatedAt,
 	importWallet,
-	isUnlocked,
 	signMessage,
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
-import {
-	bold,
-	dim,
-	formatAmount,
-	formatDate,
-	success,
-	warning,
-} from "../../utils/format.ts";
+import { dim, formatAmount } from "../../utils/format.ts";
 import { confirm, keyValue, prompt, promptPassword } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { requireArg } from "../parser.ts";
 
 /**
- * Display wallet information
+ * Display wallet info
  */
 export async function info(args: ParsedArgs): Promise<void> {
 	if (!walletExists()) {
@@ -34,9 +26,9 @@ export async function info(args: ParsedArgs): Promise<void> {
 	}
 
 	const address = getStoredAddress()!;
-	const createdAt = getWalletCreatedAt();
 
-	// Fetch on-chain data
+	consola.start("Fetching wallet info...");
+
 	const [balance, nonce] = await Promise.all([
 		getBalance(address),
 		getNonce(address),
@@ -48,9 +40,7 @@ export async function info(args: ParsedArgs): Promise<void> {
 				{
 					address,
 					balance: balance.toString(),
-					balanceFormatted: formatAmount(balance, 18),
 					nonce,
-					createdAt,
 				},
 				null,
 				2,
@@ -59,65 +49,83 @@ export async function info(args: ParsedArgs): Promise<void> {
 		return;
 	}
 
-	console.log(bold("\n💼 Wallet Information\n"));
+	console.log();
+	consola.box({
+		title: "💼 Wallet Info",
+		message: "Your DeepDex wallet details",
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
 
-	const data: Record<string, string> = {
-		Address: address,
-		Balance: `${formatAmount(balance, 18)} ETH`,
-		Nonce: nonce.toString(),
-	};
+	console.log();
 
-	if (createdAt) {
-		data.Created = formatDate(Math.floor(createdAt / 1000));
-	}
-
-	console.log(keyValue(data, 2));
+	console.log(
+		keyValue(
+			{
+				Address: address,
+				"ETH Balance": `${formatAmount(balance, 18, 6)} ETH`,
+				Nonce: nonce.toString(),
+			},
+			2,
+		),
+	);
 
 	if (balance === 0n) {
 		console.log();
-		console.log(warning("Wallet has no ETH for gas fees."));
-		console.log(dim("  Use 'deepdex faucet --token ETH' to get testnet ETH."));
+		consola.warn("No ETH for gas. Get some with: deepdex faucet --token ETH");
 	}
 
 	console.log();
 }
 
 /**
- * Export private key (with confirmation)
+ * Export private key
  */
-export async function exportKey(args: ParsedArgs): Promise<void> {
+export async function exportKey(_args: ParsedArgs): Promise<void> {
 	if (!walletExists()) {
 		throw new Error("No wallet found. Run 'deepdex init' first.");
 	}
 
 	console.log();
-	console.log(warning("⚠️  WARNING: This will display your private key."));
-	console.log(dim("  Anyone with access to this key can steal your funds."));
-	console.log(dim("  Make sure no one is watching your screen."));
-	console.log();
-
-	// Require explicit confirmation
-	if (!args.flags.yes) {
-		const confirmation = await prompt('Type "EXPORT" to confirm: ');
-		if (confirmation !== "EXPORT") {
-			console.log(info("Export cancelled."));
-			return;
-		}
-	}
-
-	// Unlock wallet if needed
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
-	}
-
-	const privateKey = getPrivateKey();
+	consola.box({
+		title: "⚠️ Export Private Key",
+		message: `WARNING: Your private key provides full access to your wallet.
+Never share it with anyone. Never paste it into websites.
+Store it securely offline.`,
+		style: {
+			padding: 1,
+			borderColor: "red",
+			borderStyle: "rounded",
+		},
+	});
 
 	console.log();
-	console.log(bold("Private Key:"));
+
+	// Confirm
+	const confirmed = await confirm(
+		"I understand the risks. Export my private key.",
+		false,
+	);
+	if (!confirmed) {
+		consola.info("Cancelled.");
+		return;
+	}
+
+	// Enter password
+	const password = await promptPassword("Enter wallet password: ");
+	const privateKey = await exportPrivateKey(password);
+
+	console.log();
+	consola.success("Private key exported:");
+	console.log();
 	console.log(`  ${privateKey}`);
 	console.log();
-	console.log(warning("Store this securely and never share it!"));
+	consola.warn(
+		"Copy this key and store it securely. It will not be shown again.",
+	);
 	console.log();
 }
 
@@ -134,58 +142,77 @@ export async function importKey(args: ParsedArgs): Promise<void> {
 		);
 	}
 
+	console.log();
+	consola.box({
+		title: "🔐 Import Wallet",
+		message: "Import your wallet from a private key",
+		style: {
+			padding: 1,
+			borderColor: "blue",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
+
 	// Check for existing wallet
 	if (walletExists()) {
-		const existingAddress = getStoredAddress();
-		console.log(warning(`A wallet already exists: ${existingAddress}`));
-
-		if (!args.flags.yes) {
-			const confirmed = await confirm("Replace existing wallet?", false);
-			if (!confirmed) {
-				console.log(info("Import cancelled."));
-				return;
-			}
+		consola.warn("A wallet already exists.");
+		const confirmed = await confirm(
+			"Replace it with the imported wallet?",
+			false,
+		);
+		if (!confirmed) {
+			consola.info("Cancelled.");
+			return;
 		}
 	}
 
-	// Get password
-	const password = await promptPassword(
-		"Create a password to encrypt your wallet: ",
-	);
+	// Set password
+	const password = await promptPassword("Create a password: ");
 	const confirmPwd = await promptPassword("Confirm password: ");
 
 	if (password !== confirmPwd) {
-		throw new Error("Passwords do not match");
+		throw new Error("Passwords do not match.");
 	}
 
 	if (password.length < 8) {
-		throw new Error("Password must be at least 8 characters");
+		throw new Error("Password must be at least 8 characters.");
 	}
 
+	// Import
+	consola.start("Importing wallet...");
 	const address = await importWallet(privateKey, password);
 
 	console.log();
-	console.log(success("Wallet imported successfully!"));
+	consola.success("Wallet imported successfully!");
 	console.log(`  Address: ${address}`);
 	console.log();
 }
 
 /**
- * Sign an arbitrary message
+ * Sign a message
  */
 export async function sign(args: ParsedArgs): Promise<void> {
-	const message = requireArg(args.positional, 0, "message");
-
 	if (!walletExists()) {
 		throw new Error("No wallet found. Run 'deepdex init' first.");
 	}
 
-	// Unlock wallet if needed
-	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
+	let message = args.positional[0];
+
+	if (!message) {
+		message = await prompt("Enter message to sign: ");
+		if (!message) {
+			throw new Error("Message is required.");
+		}
 	}
 
+	// Unlock wallet
+	const password = await promptPassword("Enter wallet password: ");
+	await unlockWallet(password);
+
+	// Sign
+	consola.start("Signing message...");
 	const signature = await signMessage(message);
 
 	if (args.flags.json) {
@@ -194,12 +221,9 @@ export async function sign(args: ParsedArgs): Promise<void> {
 	}
 
 	console.log();
-	console.log(bold("Message Signature"));
+	consola.success("Message signed:");
 	console.log();
-	console.log(dim("Message:"));
-	console.log(`  ${message}`);
-	console.log();
-	console.log(dim("Signature:"));
-	console.log(`  ${signature}`);
+	console.log(`  Message:   ${dim(message)}`);
+	console.log(`  Signature: ${signature}`);
 	console.log();
 }

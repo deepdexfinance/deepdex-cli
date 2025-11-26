@@ -2,6 +2,7 @@
  * Help system for DeepDex CLI
  */
 
+import { consola } from "consola";
 import { BANNER, VERSION } from "../utils/constants.ts";
 import { bold, dim } from "../utils/format.ts";
 
@@ -151,7 +152,10 @@ const COMMANDS: Record<string, CommandHelp> = {
 			"deepdex spot buy ETH/USDC 1.5 --price 2000 --post-only",
 		],
 		options: [
-			{ flag: "--price", description: "Limit price (omit for market order)" },
+			{
+				flag: "--price",
+				description: "Limit price (omit for market order)",
+			},
 			{ flag: "--post-only", description: "Ensure order is maker only" },
 			{ flag: "--account, -a", description: "Specify subaccount" },
 		],
@@ -164,8 +168,14 @@ const COMMANDS: Record<string, CommandHelp> = {
 			"deepdex spot sell ETH/USDC 1.5 --price 2100",
 		],
 		options: [
-			{ flag: "--price", description: "Limit price (omit for market order)" },
-			{ flag: "--reduce-only", description: "Only reduce existing position" },
+			{
+				flag: "--price",
+				description: "Limit price (omit for market order)",
+			},
+			{
+				flag: "--reduce-only",
+				description: "Only reduce existing position",
+			},
 			{ flag: "--account, -a", description: "Specify subaccount" },
 		],
 	},
@@ -189,10 +199,16 @@ const COMMANDS: Record<string, CommandHelp> = {
 				flag: "--lev, --leverage",
 				description: "Leverage multiplier (default: 1)",
 			},
-			{ flag: "--price", description: "Limit price (omit for market order)" },
+			{
+				flag: "--price",
+				description: "Limit price (omit for market order)",
+			},
 			{ flag: "--tp", description: "Take-profit price" },
 			{ flag: "--sl", description: "Stop-loss price" },
-			{ flag: "--reduce-only", description: "Only reduce existing position" },
+			{
+				flag: "--reduce-only",
+				description: "Only reduce existing position",
+			},
 			{ flag: "--account, -a", description: "Specify subaccount" },
 		],
 	},
@@ -208,10 +224,16 @@ const COMMANDS: Record<string, CommandHelp> = {
 				flag: "--lev, --leverage",
 				description: "Leverage multiplier (default: 1)",
 			},
-			{ flag: "--price", description: "Limit price (omit for market order)" },
+			{
+				flag: "--price",
+				description: "Limit price (omit for market order)",
+			},
 			{ flag: "--tp", description: "Take-profit price" },
 			{ flag: "--sl", description: "Stop-loss price" },
-			{ flag: "--reduce-only", description: "Only reduce existing position" },
+			{
+				flag: "--reduce-only",
+				description: "Only reduce existing position",
+			},
 			{ flag: "--account, -a", description: "Specify subaccount" },
 		],
 	},
@@ -358,54 +380,61 @@ export function showMainHelp(): void {
 	console.log(BANNER);
 	console.log(`  ${dim("Version")} ${VERSION}\n`);
 
-	console.log(bold("USAGE"));
-	console.log(`  deepdex <command> [options]\n`);
+	consola.box({
+		title: "DeepDex CLI",
+		message: `High-performance trading bot for the DeepDex protocol
 
-	console.log(bold("COMMANDS"));
-	console.log(`  ${dim("Setup")}`);
-	console.log(`    init              Initialize wallet and configuration`);
-	console.log(`    quickstart        Interactive setup wizard\n`);
+${bold("USAGE")}
+  deepdex <command> [options]
 
-	console.log(`  ${dim("Wallet & Account")}`);
-	console.log(`    wallet            Wallet management`);
-	console.log(`    account           Subaccount management`);
-	console.log(`    faucet            Mint testnet tokens`);
-	console.log(`    balance           View token balances`);
-	console.log(`    portfolio         Portfolio summary\n`);
+${bold("SETUP")}
+  init              Initialize wallet and configuration
+  quickstart        Interactive setup wizard
 
-	console.log(`  ${dim("Market Data")}`);
-	console.log(`    market            Market information and data\n`);
+${bold("WALLET & ACCOUNT")}
+  wallet            Wallet management
+  account           Subaccount management
+  faucet            Mint testnet tokens
+  balance           View token balances
+  portfolio         Portfolio summary
 
-	console.log(`  ${dim("Trading")}`);
-	console.log(`    spot              Spot trading (buy/sell)`);
-	console.log(`    perp              Perpetual trading (long/short)`);
-	console.log(`    order             Order management`);
-	console.log(`    position          Position management\n`);
+${bold("MARKET DATA")}
+  market            Market information and data
 
-	console.log(`  ${dim("Automation")}`);
-	console.log(`    bot               Trading bot management\n`);
+${bold("TRADING")}
+  spot              Spot trading (buy/sell)
+  perp              Perpetual trading (long/short)
+  order             Order management
+  position          Position management
 
-	console.log(`  ${dim("Utility")}`);
-	console.log(`    config            Configuration management`);
-	console.log(`    health            System health check`);
-	console.log(`    history           Trade and transfer history\n`);
+${bold("AUTOMATION")}
+  bot               Trading bot management
 
-	console.log(bold("ALIASES"));
-	console.log(`    buy               → spot buy`);
-	console.log(`    sell              → spot sell`);
-	console.log(`    long              → perp long`);
-	console.log(`    short             → perp short\n`);
+${bold("UTILITY")}
+  config            Configuration management
+  health            System health check
+  history           Trade and transfer history
 
-	console.log(bold("GLOBAL OPTIONS"));
-	console.log(`    --account, -a     Specify subaccount`);
-	console.log(`    --json            Output in JSON format`);
-	console.log(`    --yes, -y         Skip confirmations`);
-	console.log(`    --verbose, -v     Verbose output`);
-	console.log(`    --dry-run         Simulate without executing`);
-	console.log(`    --help, -h        Show help\n`);
+${bold("ALIASES")}
+  buy  → spot buy     sell  → spot sell
+  long → perp long    short → perp short
+
+${bold("GLOBAL OPTIONS")}
+  --account, -a     Specify subaccount
+  --json            Output in JSON format
+  --yes, -y         Skip confirmations
+  --verbose, -v     Verbose output
+  --dry-run         Simulate without executing
+  --help, -h        Show help`,
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
 
 	console.log(
-		`Run ${dim("deepdex <command> --help")} for command-specific help.`,
+		`\nRun ${dim("deepdex <command> --help")} for command-specific help.`,
 	);
 }
 
@@ -417,15 +446,23 @@ export function showCommandHelp(commandPath: string[]): void {
 	const help = COMMANDS[key];
 
 	if (!help) {
-		console.log(`Unknown command: ${key}`);
-		console.log(`Run ${dim("deepdex help")} for available commands.`);
+		consola.error(`Unknown command: ${key}`);
+		consola.info(`Run 'deepdex help' for available commands.`);
 		return;
 	}
 
-	console.log(`\n${bold(key.toUpperCase())}`);
-	console.log(`  ${help.description}\n`);
+	console.log();
+	consola.box({
+		title: key.toUpperCase(),
+		message: help.description,
+		style: {
+			padding: 1,
+			borderColor: "blue",
+			borderStyle: "rounded",
+		},
+	});
 
-	console.log(bold("USAGE"));
+	console.log(`\n${bold("USAGE")}`);
 	console.log(`  ${help.usage}\n`);
 
 	if (help.subcommands) {

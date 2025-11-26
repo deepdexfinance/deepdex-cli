@@ -160,6 +160,39 @@ export function getPrivateKey(): Hex {
 }
 
 /**
+ * Export private key with password verification
+ * Use with caution - this returns the plaintext private key
+ */
+export async function exportPrivateKey(password: string): Promise<Hex> {
+	if (!walletExists()) {
+		throw new Error("No wallet found. Run 'deepdex init' first.");
+	}
+
+	const data = readFileSync(WALLET_PATH, "utf8");
+	const stored: StoredWallet = JSON.parse(data);
+
+	try {
+		const privateKey = await decrypt(
+			stored.encrypted,
+			password,
+			stored.salt,
+			stored.iv,
+		);
+
+		const account = privateKeyToAccount(privateKey as Hex);
+
+		// Verify address matches
+		if (account.address.toLowerCase() !== stored.address.toLowerCase()) {
+			throw new Error("Decrypted key does not match stored address");
+		}
+
+		return privateKey as Hex;
+	} catch {
+		throw new Error("Invalid password");
+	}
+}
+
+/**
  * Get stored wallet address without unlocking
  */
 export function getStoredAddress(): Address | null {

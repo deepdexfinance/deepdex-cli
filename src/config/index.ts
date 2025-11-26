@@ -5,11 +5,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { DeepDexConfig } from "../types/index.ts";
 import {
-	CONFIG_PATH,
+	CONFIG_PATH as CONFIG_PATH_CONST,
 	DEEPDEX_HOME,
 	DEFAULT_CONFIG,
 	LOGS_DIR,
 } from "../utils/constants.ts";
+
+// Re-export CONFIG_PATH for convenience
+export const CONFIG_PATH = CONFIG_PATH_CONST;
 
 // ============================================================================
 // Configuration Management
@@ -128,7 +131,7 @@ export function configExists(): boolean {
 // Config Validation
 // ============================================================================
 
-const VALID_CONFIG_KEYS = [
+export const VALID_CONFIG_KEYS = [
 	"default_account",
 	"rpc_url",
 	"confirmations",

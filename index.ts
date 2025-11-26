@@ -16,9 +16,9 @@
  * ```
  */
 
+import { consola } from "consola";
 import { parseArgs, route } from "./src/cli/index.ts";
 import { VERSION } from "./src/utils/constants.ts";
-import { error } from "./src/utils/format.ts";
 
 /**
  * Main CLI entry point
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
 
 	// Handle version flag
 	if (args.includes("--version") || args.includes("-V")) {
-		console.log(`deepdex v${VERSION}`);
+		consola.log(`deepdex v${VERSION}`);
 		return;
 	}
 
@@ -41,12 +41,12 @@ async function main(): Promise<void> {
 // Run the CLI
 main().catch((err) => {
 	if (err instanceof Error) {
-		console.error(error(err.message));
+		consola.error(err.message);
 		if (process.env.DEBUG) {
 			console.error(err.stack);
 		}
 	} else {
-		console.error(error(String(err)));
+		consola.error(String(err));
 	}
 	process.exit(1);
 });

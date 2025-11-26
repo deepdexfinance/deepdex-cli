@@ -2,6 +2,7 @@
  * Init command - Setup wizard for DeepDex CLI
  */
 
+import { consola } from "consola";
 import {
 	ensureDirectories,
 	loadConfig,
@@ -20,18 +21,9 @@ import {
 	bold,
 	dim,
 	formatAmount,
-	info,
-	success,
 	truncateAddress,
-	warning,
 } from "../../utils/format.ts";
-import {
-	confirm,
-	prompt,
-	promptPassword,
-	select,
-	spinner,
-} from "../../utils/ui.ts";
+import { confirm, prompt, promptPassword, select } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 
 /**
@@ -43,7 +35,7 @@ export async function run(_args: ParsedArgs): Promise<void> {
 	// Check if already initialized
 	if (walletExists()) {
 		const address = getStoredAddress();
-		console.log(warning("Wallet already exists!"));
+		consola.warn("Wallet already exists!");
 		console.log(`  Address: ${truncateAddress(address!)}`);
 		console.log();
 
@@ -52,7 +44,7 @@ export async function run(_args: ParsedArgs): Promise<void> {
 			false,
 		);
 		if (!overwrite) {
-			console.log(info("Keeping existing wallet."));
+			consola.info("Keeping existing wallet.");
 			return;
 		}
 	}
@@ -60,7 +52,17 @@ export async function run(_args: ParsedArgs): Promise<void> {
 	ensureDirectories();
 
 	// Choose setup method
-	console.log(bold("\n🔐 Wallet Setup\n"));
+	consola.box({
+		title: "🔐 Wallet Setup",
+		message: "Create or import your trading wallet",
+		style: {
+			padding: 1,
+			borderColor: "cyan",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	const method = await select("How would you like to set up your wallet?", [
 		{ value: "new", label: "Create a new wallet" },
@@ -93,12 +95,9 @@ export async function run(_args: ParsedArgs): Promise<void> {
 			throw new Error("Password must be at least 8 characters");
 		}
 
-		const spin = spinner("Importing wallet...");
-		spin.start();
-
+		consola.start("Importing wallet...");
 		address = await importWallet(privateKey, password);
-
-		spin.stop(success("Wallet imported successfully!"));
+		consola.success("Wallet imported successfully!");
 	} else {
 		// Create new wallet
 		console.log();
@@ -115,18 +114,22 @@ export async function run(_args: ParsedArgs): Promise<void> {
 			throw new Error("Password must be at least 8 characters");
 		}
 
-		const spin = spinner("Creating new wallet...");
-		spin.start();
-
+		consola.start("Creating new wallet...");
 		address = await createWallet(password);
-
-		spin.stop(success("Wallet created successfully!"));
+		consola.success("Wallet created successfully!");
 	}
 
 	// Display wallet info
 	console.log();
-	console.log(bold("Your Wallet"));
-	console.log(`  Address: ${COLORS.info}${address}${COLORS.reset}`);
+	consola.box({
+		title: "💼 Your Wallet",
+		message: `Address: ${COLORS.info}${address}${COLORS.reset}`,
+		style: {
+			padding: 1,
+			borderColor: "green",
+			borderStyle: "rounded",
+		},
+	});
 
 	// Check balance
 	try {
@@ -135,7 +138,7 @@ export async function run(_args: ParsedArgs): Promise<void> {
 
 		if (balance === 0n) {
 			console.log();
-			console.log(warning("Your wallet has no ETH for gas fees."));
+			consola.warn("Your wallet has no ETH for gas fees.");
 			console.log(dim("  Send some testnet ETH to this address, or use:"));
 			console.log(dim("  $ deepdex faucet --token ETH"));
 		}
@@ -149,20 +152,21 @@ export async function run(_args: ParsedArgs): Promise<void> {
 
 	// Next steps
 	console.log();
-	console.log(bold("📋 Next Steps"));
-	console.log(`${dim("  1. Get testnet tokens:        ")}deepdex faucet`);
-	console.log(
-		`${dim("  2. Create a subaccount:       ")}deepdex account create`,
-	);
-	console.log(
-		dim("  3. Deposit collateral:        ") +
-			"deepdex account deposit 1000 USDC",
-	);
-	console.log(
-		`${dim("  4. Start trading:             ")}deepdex spot buy ETH/USDC 0.1`,
-	);
+	consola.box({
+		title: "📋 Next Steps",
+		message: `1. Get testnet tokens:     deepdex faucet
+2. Create a subaccount:    deepdex account create
+3. Deposit collateral:     deepdex account deposit 1000 USDC
+4. Start trading:          deepdex spot buy ETH/USDC 0.1`,
+		style: {
+			padding: 1,
+			borderColor: "yellow",
+			borderStyle: "rounded",
+		},
+	});
+
 	console.log();
-	console.log(info("Run 'deepdex help' for all available commands."));
+	consola.info("Run 'deepdex help' for all available commands.");
 }
 
 /**
@@ -170,75 +174,88 @@ export async function run(_args: ParsedArgs): Promise<void> {
  */
 export async function quickstart(args: ParsedArgs): Promise<void> {
 	console.log(BANNER);
-	console.log(bold("\n🚀 Quick Start Wizard\n"));
-	console.log(dim("This wizard will help you set up everything in one go.\n"));
+
+	consola.box({
+		title: "🚀 Quick Start Wizard",
+		message: "This wizard will help you set up everything in one go.",
+		style: {
+			padding: 1,
+			borderColor: "magenta",
+			borderStyle: "rounded",
+		},
+	});
+
+	console.log();
 
 	// Step 1: Wallet
-	console.log(bold("Step 1: Wallet Setup"));
+	consola.info(bold("Step 1: Wallet Setup"));
 	if (!walletExists()) {
 		await run(args);
 	} else {
 		const address = getStoredAddress();
-		console.log(
-			success(`Wallet already configured: ${truncateAddress(address!)}`),
-		);
+		consola.success(`Wallet already configured: ${truncateAddress(address!)}`);
 
 		// Unlock wallet
 		const password = await promptPassword("Enter your wallet password: ");
 		await unlockWallet(password);
-		console.log(success("Wallet unlocked"));
+		consola.success("Wallet unlocked");
 	}
 
 	// Step 2: Faucet
 	console.log();
-	console.log(bold("Step 2: Get Testnet Tokens"));
+	consola.info(bold("Step 2: Get Testnet Tokens"));
 	const wantFaucet = await confirm(
 		"Would you like to mint testnet USDC?",
 		true,
 	);
 	if (wantFaucet) {
-		console.log(info("Minting testnet USDC..."));
+		consola.start("Minting testnet USDC...");
 		console.log(dim("(In production, this would call the faucet contract)"));
-		console.log(success("Received 10,000 USDC"));
+		consola.success("Received 10,000 USDC");
 	}
 
 	// Step 3: Create Account
 	console.log();
-	console.log(bold("Step 3: Create Subaccount"));
+	consola.info(bold("Step 3: Create Subaccount"));
 	const accountName = await prompt(
 		"Enter a name for your subaccount (default: main): ",
 	);
 	const name = accountName || "main";
-	console.log(info(`Creating subaccount '${name}'...`));
+	consola.start(`Creating subaccount '${name}'...`);
 	console.log(
 		dim("(In production, this would create the subaccount on-chain)"),
 	);
-	console.log(success(`Subaccount '${name}' created`));
+	consola.success(`Subaccount '${name}' created`);
 
 	// Step 4: Deposit
 	console.log();
-	console.log(bold("Step 4: Deposit Collateral"));
+	consola.info(bold("Step 4: Deposit Collateral"));
 	const depositAmount = await prompt(
 		"How much USDC to deposit? (default: 1000): ",
 	);
 	const amount = depositAmount || "1000";
-	console.log(info(`Depositing ${amount} USDC...`));
+	consola.start(`Depositing ${amount} USDC...`);
 	console.log(dim("(In production, this would deposit to the subaccount)"));
-	console.log(success(`${amount} USDC deposited to '${name}'`));
+	consola.success(`${amount} USDC deposited to '${name}'`);
 
 	// Done
 	console.log();
-	console.log("═".repeat(60));
-	console.log(bold("\n✨ Setup Complete!\n"));
-	console.log("You're ready to start trading. Try these commands:");
-	console.log();
-	console.log(dim("  Check your balance:"));
-	console.log("  $ deepdex balance");
-	console.log();
-	console.log(dim("  View markets:"));
-	console.log("  $ deepdex market list");
-	console.log();
-	console.log(dim("  Place your first trade:"));
-	console.log("  $ deepdex spot buy ETH/USDC 0.1");
-	console.log();
+	consola.box({
+		title: "✨ Setup Complete!",
+		message: `You're ready to start trading. Try these commands:
+
+Check your balance:
+  $ deepdex balance
+
+View markets:
+  $ deepdex market list
+
+Place your first trade:
+  $ deepdex spot buy ETH/USDC 0.1`,
+		style: {
+			padding: 1,
+			borderColor: "green",
+			borderStyle: "rounded",
+		},
+	});
 }
