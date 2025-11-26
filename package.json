@@ -1,14 +1,30 @@
 {
-	"name": "deepdex-trader",
+	"name": "deepdex",
+	"version": "1.0.0",
+	"description": "High-performance CLI trading bot for the DeepDex protocol",
 	"module": "index.ts",
 	"type": "module",
+	"bin": {
+		"deepdex": "./index.ts"
+	},
 	"scripts": {
 		"start": "bun index.ts",
+		"dev": "bun --watch index.ts",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"format": "biome format ."
 	},
-	"private": true,
+	"private": false,
+	"keywords": [
+		"trading",
+		"defi",
+		"perpetuals",
+		"spot",
+		"cli",
+		"bot"
+	],
+	"author": "DeepDex",
+	"license": "MIT",
 	"devDependencies": {
 		"@biomejs/biome": "2.3.7",
 		"@types/bun": "latest",
