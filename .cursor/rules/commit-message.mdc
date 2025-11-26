@@ -1,0 +1,7 @@
+---
+alwaysApply: false
+---
+- Commit messages MUST start with a semantic tag (e.g., feat, fix, chore, refactor, style, docs, test).
+- Keep the subject line as short and concise as possible (ideally under 50 characters).
+- Use imperative mood in the subject line (e.g., "Add feature" not "Added feature").
+- Do not end the subject line with a period.
