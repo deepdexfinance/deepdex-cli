@@ -1,5 +1,5 @@
 {
-	"name": "deepdex",
+	"name": "@deepdex/cli",
 	"version": "1.0.0",
 	"description": "High-performance CLI trading bot for the DeepDex protocol",
 	"module": "index.ts",

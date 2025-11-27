@@ -428,7 +428,7 @@ ${bold("GLOBAL OPTIONS")}
   --help, -h        Show help`,
 		style: {
 			padding: 1,
-			borderColor: "cyan",
+			borderColor: "magentaBright",
 			borderStyle: "rounded",
 		},
 	});
@@ -457,7 +457,7 @@ export function showCommandHelp(commandPath: string[]): void {
 		message: help.description,
 		style: {
 			padding: 1,
-			borderColor: "blue",
+			borderColor: "magentaBright",
 			borderStyle: "rounded",
 		},
 	});

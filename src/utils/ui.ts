@@ -9,7 +9,6 @@ import { bold, dim } from "./format.ts";
 
 // Create a custom consola instance for DeepDex
 export const logger = createConsola({
-	fancy: true,
 	formatOptions: {
 		colors: true,
 		compact: false,
@@ -125,6 +124,10 @@ export function box(title: string, content: string, width = 60): string {
 	const lines: string[] = [];
 	const innerWidth = width - 4;
 
+	// Border color: #c084fc (purple)
+	const borderColor = "\x1b[38;2;192;132;252m";
+	const reset = "\x1b[0m";
+
 	// Top border with title
 	const titlePadded = ` ${title} `;
 	const leftBorder = SYMBOLS.border.h.repeat(
@@ -135,11 +138,15 @@ export function box(title: string, content: string, width = 60): string {
 	);
 
 	lines.push(
-		SYMBOLS.corner.tl +
+		borderColor +
+			SYMBOLS.corner.tl +
 			leftBorder +
+			reset +
 			bold(titlePadded) +
+			borderColor +
 			rightBorder +
-			SYMBOLS.corner.tr,
+			SYMBOLS.corner.tr +
+			reset,
 	);
 
 	// Content
@@ -148,15 +155,17 @@ export function box(title: string, content: string, width = 60): string {
 		const stripped = stripAnsi(line);
 		const padding = innerWidth - stripped.length;
 		lines.push(
-			`${SYMBOLS.border.v} ${line}${" ".repeat(Math.max(0, padding))} ${SYMBOLS.border.v}`,
+			`${borderColor}${SYMBOLS.border.v}${reset} ${line}${" ".repeat(Math.max(0, padding))} ${borderColor}${SYMBOLS.border.v}${reset}`,
 		);
 	}
 
 	// Bottom border
 	lines.push(
-		SYMBOLS.corner.bl +
+		borderColor +
+			SYMBOLS.corner.bl +
 			SYMBOLS.border.h.repeat(innerWidth + 2) +
-			SYMBOLS.corner.br,
+			SYMBOLS.corner.br +
+			reset,
 	);
 
 	return lines.join("\n");
@@ -248,7 +257,7 @@ export async function select(
 	const index = Number.parseInt(answer, 10) - 1;
 
 	if (index >= 0 && index < options.length) {
-		return options[index]?.value;
+		return options[index]!.value;
 	}
 
 	throw new Error("Invalid selection");
