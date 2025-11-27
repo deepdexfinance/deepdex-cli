@@ -146,9 +146,8 @@ export async function info(args: ParsedArgs): Promise<void> {
 					Size: formatAmount(position.size, 18, 4),
 					"Entry Price": `$${formatAmount(position.entryPrice, PRICE_DECIMALS, 2)}`,
 					"Mark Price": `$${formatAmount(position.markPrice, PRICE_DECIMALS, 2)}`,
-					"Unrealized PnL": formatPnL(position.unrealizedPnl, USDC_DECIMALS),
+					"Realized PnL": formatPnL(position.unrealizedPnl, USDC_DECIMALS),
 					Leverage: formatLeverage(position.leverage),
-					Margin: `${formatAmount(position.margin, USDC_DECIMALS, 2)} USDC`,
 					"Take Profit": position.takeProfit
 						? `$${formatAmount(position.takeProfit, PRICE_DECIMALS, 2)}`
 						: dim("Not set"),

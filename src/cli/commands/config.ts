@@ -48,16 +48,10 @@ export async function show(args: ParsedArgs): Promise<void> {
 	if (config.trading) {
 		flatConfig["trading.default_leverage"] =
 			config.trading.default_leverage?.toString() || "1";
-		flatConfig["trading.slippage_tolerance"] =
-			config.trading.slippage_tolerance?.toString() || "0.5";
-		flatConfig["trading.confirm_trades"] =
-			config.trading.confirm_trades?.toString() || "true";
-	}
-
-	if (config.display) {
-		flatConfig["display.colors"] = config.display.colors?.toString() || "true";
-		flatConfig["display.compact"] =
-			config.display.compact?.toString() || "false";
+		flatConfig["trading.max_slippage"] =
+			config.trading.max_slippage?.toString() || "0.5";
+		flatConfig["trading.auto_approve"] =
+			config.trading.auto_approve?.toString() || "false";
 	}
 
 	console.log(keyValue(flatConfig, 2));

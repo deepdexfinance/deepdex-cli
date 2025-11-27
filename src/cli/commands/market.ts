@@ -378,7 +378,7 @@ export async function funding(args: ParsedArgs): Promise<void> {
 	console.log();
 
 	if (perpMarket) {
-		const fundingRate = Number(perpMarket.fundingRate) / 1e6;
+		const fundingRate = Number(perpMarket.funding_rate) / 1e6;
 		const annualized = fundingRate * 365 * 24;
 
 		console.log(
@@ -386,9 +386,9 @@ export async function funding(args: ParsedArgs): Promise<void> {
 				{
 					"Current Rate": `${formatPercent(fundingRate * 100, true)} / 8h`,
 					Annualized: formatPercent(annualized, true),
-					"Open Interest": formatAmount(perpMarket.openInterest, 18, 2),
-					"Long Positions": perpMarket.longOpenPosNum.toString(),
-					"Short Positions": perpMarket.shortOpenPosNum.toString(),
+					"Open Interest": formatAmount(perpMarket.open_interest, 18, 2),
+					"Long Positions": perpMarket.long_open_pos_num.toString(),
+					"Short Positions": perpMarket.short_open_pos_num.toString(),
 				},
 				2,
 			),

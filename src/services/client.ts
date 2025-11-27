@@ -13,6 +13,7 @@ import {
 	type WalletClient,
 } from "viem";
 import { network, perpPairs, spotPairs } from "../abis/config.ts";
+import { LendingABI } from "../abis/lending.ts";
 import { PerpABI } from "../abis/perp.ts";
 import { SpotABI } from "../abis/spot.ts";
 import { SubaccountABI } from "../abis/subaccount.ts";
@@ -26,6 +27,7 @@ import type {
 	SpotOrder,
 	Subaccount,
 } from "../types/index.ts";
+import { LENDING_MARKET_ID } from "../utils/constants.ts";
 import { getAccount } from "./wallet.ts";
 
 // ============================================================================
@@ -244,8 +246,8 @@ export async function setDelegate(
  */
 export function getMarkets(): { spot: MarketPair[]; perp: MarketPair[] } {
 	return {
-		spot: spotPairs.filter((p) => !p.disabled),
-		perp: perpPairs.filter((p) => !p.disabled),
+		spot: spotPairs.filter((p) => !p.disabled) as MarketPair[],
+		perp: perpPairs.filter((p) => !p.disabled) as MarketPair[],
 	};
 }
 
@@ -259,7 +261,9 @@ export function findMarket(pair: string): MarketPair | null {
 	const spotMarket = spotPairs.find(
 		(p) => p.value.toUpperCase() === normalizedPair,
 	);
-	if (spotMarket) return spotMarket;
+	if (spotMarket) {
+		return spotMarket as MarketPair;
+	}
 
 	// Check perp markets
 	const perpMarket = perpPairs.find(
@@ -267,7 +271,9 @@ export function findMarket(pair: string): MarketPair | null {
 			p.value.toUpperCase() === normalizedPair ||
 			p.label.toUpperCase() === normalizedPair,
 	);
-	if (perpMarket) return perpMarket;
+	if (perpMarket) {
+		return perpMarket as MarketPair;
+	}
 
 	return null;
 }
@@ -364,7 +370,7 @@ export async function getUserPerpPositions(
 	})) as PerpPosition[];
 
 	// Filter out empty positions
-	return positions.filter((p) => p.baseAssetAmount > 0n);
+	return positions.filter((p) => p.base_asset_amount > 0n);
 }
 
 /**
@@ -767,7 +773,6 @@ export async function getPositions(owner: Address): Promise<
 		markPrice: bigint;
 		unrealizedPnl: bigint;
 		leverage: number;
-		margin: bigint;
 		takeProfit: bigint | null;
 		stopLoss: bigint | null;
 	}[]
@@ -788,15 +793,14 @@ export async function getPositions(owner: Address): Promise<
 
 	return positions.map((p, i) => ({
 		market: perp[i]?.value || `Market ${i}`,
-		isLong: p.isLong,
-		size: p.baseAssetAmount,
-		entryPrice: p.entryPrice,
+		isLong: p.is_long,
+		size: p.base_asset_amount,
+		entryPrice: p.entry_price,
 		markPrice: 0n, // Would need to fetch
-		unrealizedPnl: p.unrealizedPnL,
+		unrealizedPnl: p.realized_pnl, // Using realized_pnl from ABI
 		leverage: Number(p.leverage),
-		margin: p.quoteAssetAmount,
-		takeProfit: p.takeProfit > 0n ? p.takeProfit : null,
-		stopLoss: p.stopLoss > 0n ? p.stopLoss : null,
+		takeProfit: p.take_profit > 0n ? p.take_profit : null,
+		stopLoss: p.stop_loss > 0n ? p.stop_loss : null,
 	}));
 }
 
@@ -807,11 +811,10 @@ export async function getOpenOrders(owner: Address): Promise<
 	{
 		id: string;
 		market: string;
-		side: "buy" | "sell";
+		side: "long" | "short";
 		type: string;
-		price: bigint | null;
-		size: bigint;
-		filled: bigint;
+		price: bigint;
+		orderSide: number;
 	}[]
 > {
 	// Get user's subaccounts first
@@ -824,13 +827,12 @@ export async function getOpenOrders(owner: Address): Promise<
 	const orders = await getUserActiveOrders(subaccount.address);
 
 	return orders.map((o) => ({
-		id: `0x${o.orderId.toString(16)}`,
-		market: `Market ${o.marketId}`,
-		side: o.isBuy ? "buy" : "sell",
-		type: o.orderType === 0 ? "market" : "limit",
+		id: `0x${o.order_id.toString(16)}`,
+		market: `Market ${o.market_id}`,
+		side: o.order_side === 0 ? "long" : "short",
+		type: o.order_type === 0 ? "market" : "limit",
 		price: o.price,
-		size: o.amount,
-		filled: o.filledAmount,
+		orderSide: o.order_side,
 	}));
 }
 
@@ -855,25 +857,125 @@ export async function placeSpotOrder(params: {
 }
 
 /**
- * Deposit to subaccount (placeholder for future implementation)
+ * Deposit to subaccount
+ * Deposits assets to the lending contract for a given subaccount
+ * @param subaccount - The subaccount address to deposit to
+ * @param token - The token symbol (e.g., "USDC", "ETH", "SOL")
+ * @param amount - The amount to deposit (in token's smallest unit)
  */
 export async function depositToSubaccount(
 	subaccount: Address,
-	token: Address,
+	token: string,
 	amount: bigint,
 ): Promise<Hex> {
-	// In production, this would call the appropriate deposit function
-	throw new Error("Deposit function not yet implemented for testnet");
+	const client = getWalletClient();
+	const account = getAccount();
+
+	// Convert token symbol to bytes
+	const assetBytes =
+		`0x${Buffer.from(token.toUpperCase()).toString("hex")}` as Hex;
+
+	const hash = await client.writeContract({
+		address: network.contracts.lending as Address,
+		abi: LendingABI,
+		functionName: "deposit",
+		args: [subaccount, assetBytes, amount],
+		account,
+		chain: deepdexTestnet,
+	});
+
+	return hash;
 }
 
 /**
- * Withdraw from subaccount (placeholder for future implementation)
+ * Withdraw from subaccount
+ * Withdraws assets from the lending contract for a given subaccount
+ * @param subaccount - The subaccount address to withdraw from
+ * @param token - The token symbol (e.g., "USDC", "ETH", "SOL")
+ * @param amount - The amount to withdraw (in token's smallest unit)
  */
 export async function withdrawFromSubaccount(
 	subaccount: Address,
-	token: Address,
+	token: string,
 	amount: bigint,
 ): Promise<Hex> {
-	// In production, this would call the appropriate withdraw function
-	throw new Error("Withdraw function not yet implemented for testnet");
+	const client = getWalletClient();
+	const account = getAccount();
+
+	// Convert token symbol to bytes
+	const assetBytes =
+		`0x${Buffer.from(token.toUpperCase()).toString("hex")}` as Hex;
+
+	const hash = await client.writeContract({
+		address: network.contracts.lending as Address,
+		abi: LendingABI,
+		functionName: "withdraw",
+		args: [subaccount, assetBytes, amount],
+		account,
+		chain: deepdexTestnet,
+	});
+
+	return hash;
+}
+
+/**
+ * Borrow from subaccount
+ * Borrows assets from the lending contract for a given subaccount
+ * @param subaccount - The subaccount address to borrow from
+ * @param token - The token symbol (e.g., "USDC", "ETH", "SOL")
+ * @param amount - The amount to borrow (in token's smallest unit)
+ */
+export async function borrowFromSubaccount(
+	subaccount: Address,
+	token: string,
+	amount: bigint,
+): Promise<Hex> {
+	const client = getWalletClient();
+	const account = getAccount();
+
+	// Convert token symbol to bytes
+	const assetBytes =
+		`0x${Buffer.from(token.toUpperCase()).toString("hex")}` as Hex;
+
+	const hash = await client.writeContract({
+		address: network.contracts.lending as Address,
+		abi: LendingABI,
+		functionName: "borrow",
+		args: [subaccount, LENDING_MARKET_ID, assetBytes, amount],
+		account,
+		chain: deepdexTestnet,
+	});
+
+	return hash;
+}
+
+/**
+ * Repay to subaccount
+ * Repays borrowed assets to the lending contract for a given subaccount
+ * @param subaccount - The subaccount address to repay for
+ * @param token - The token symbol (e.g., "USDC", "ETH", "SOL")
+ * @param amount - The amount to repay (in token's smallest unit)
+ */
+export async function repayToSubaccount(
+	subaccount: Address,
+	token: string,
+	amount: bigint,
+): Promise<Hex> {
+	const client = getWalletClient();
+	const account = getAccount();
+
+	// Convert token symbol to bytes
+	const assetBytes =
+		`0x${Buffer.from(token.toUpperCase()).toString("hex")}` as Hex;
+
+	const hash = await client.writeContract({
+		address: network.contracts.lending as Address,
+		abi: LendingABI,
+		functionName: "repay",
+		args: [subaccount, LENDING_MARKET_ID, assetBytes, amount],
+		account,
+		chain: deepdexTestnet,
+	});
+
+	return hash;
 }

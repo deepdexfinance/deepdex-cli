@@ -15,6 +15,7 @@ export const WALLET_PATH = join(DEEPDEX_HOME, "wallet.json");
 export const BOT_PID_PATH = join(DEEPDEX_HOME, "bot.pid");
 export const LOGS_DIR = join(DEEPDEX_HOME, "logs");
 export const BOT_LOG_PATH = join(LOGS_DIR, "bot.log");
+export const LENDING_MARKET_ID = 1;
 
 // ============================================================================
 // Default Configuration
