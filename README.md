@@ -4,8 +4,30 @@ A high-performance CLI trading bot and utility suite for the DeepDex protocol. T
 
 ## Install
 
+### Quick Install (Recommended)
+
 ```bash
-npm install -g deepdex
+curl -fsSL https://raw.githubusercontent.com/deepdex/deepdex/main/install.sh | bash
+```
+
+Or with wget:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/deepdex/deepdex/main/install.sh | bash
+```
+
+### Manual Install
+
+```bash
+git clone https://github.com/deepdex/deepdex.git ~/.deepdex
+cd ~/.deepdex
+bun install
+```
+
+### Uninstall
+
+```bash
+~/.deepdex/install.sh --uninstall
 ```
 
 ## Quick Start
