@@ -1,7 +1,4 @@
-/**
- * Formatting utilities for DeepDex CLI
- */
-
+import BigNumber from "bignumber.js";
 import { consola } from "consola";
 import { type Address, formatUnits } from "viem";
 import { COLORS, SYMBOLS, USDC_DECIMALS } from "./constants.ts";
@@ -28,6 +25,25 @@ export function formatAmount(
 		minimumFractionDigits: 0,
 		maximumFractionDigits: precision,
 	});
+}
+
+/**
+ * Format number to match tick size or step size
+ */
+export function formatToSize(
+	value: string | number | BigNumber | bigint,
+	size: number,
+): string {
+	const val = new BigNumber(value);
+	const step = new BigNumber(size);
+	if (step.isZero()) return val.toString();
+
+	const decimals = size.toString().split(".")[1]?.length || 0;
+	const rounded = val
+		.div(step)
+		.integerValue(BigNumber.ROUND_HALF_UP)
+		.times(step);
+	return rounded.toFixed(decimals);
 }
 
 /**

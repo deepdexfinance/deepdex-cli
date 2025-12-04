@@ -10,7 +10,6 @@ import type { Address, Hex } from "viem";
 
 export interface DeepDexConfig {
 	default_account: string;
-	rpc_url: string;
 	confirmations: boolean;
 	output_format: "table" | "json";
 	notifications: {
@@ -135,6 +134,8 @@ export interface MarketPair {
 	orderDecimal: number;
 	leverage: number;
 	sizeOptions: number[];
+	tickSize: number;
+	stepSize: number;
 	tokens: TokenInfo[];
 }
 

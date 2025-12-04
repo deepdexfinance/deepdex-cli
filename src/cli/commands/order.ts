@@ -3,7 +3,13 @@
  */
 
 import { consola } from "consola";
-import { getOpenOrders } from "../../services/client.ts";
+import { network } from "../../abis/config.ts";
+import {
+	cancelPerpOrder,
+	getOpenOrders,
+	getPublicClient,
+	getUserSubaccounts,
+} from "../../services/client.ts";
 import {
 	getStoredAddress,
 	isUnlocked,
@@ -78,8 +84,9 @@ export async function list(args: ParsedArgs): Promise<void> {
 			Price: order.price
 				? `$${formatAmount(order.price, PRICE_DECIMALS, 2)}`
 				: "MARKET",
-			Size: formatAmount(order.size, 18, 4),
-			Filled: `${((Number(order.filled) / Number(order.size)) * 100).toFixed(0)}%`,
+			// @TODO: update abi to include filledAmount and filledPrice
+			Size: "N/A",
+			Filled: "N/A",
 		}));
 
 		console.log(
@@ -133,12 +140,45 @@ export async function cancel(args: ParsedArgs): Promise<void> {
 
 	consola.start("Cancelling order...");
 
-	// Simulate transaction
-	await new Promise((resolve) => setTimeout(resolve, 1000));
+	try {
+		const address = getStoredAddress()!;
+		const subaccounts = await getUserSubaccounts(address);
+		const subaccount = subaccounts[0]; // Use first subaccount
 
-	console.log();
-	consola.success("Order cancelled");
-	console.log();
+		if (!subaccount) {
+			throw new Error("No subaccount found.");
+		}
+
+		// Find the order to get market ID
+		const orders = await getOpenOrders(address);
+		const order = orders.find(
+			(o) => o.id === orderId || o.id === `0x${Number(orderId).toString(16)}`,
+		);
+
+		if (!order) {
+			throw new Error(`Order ${orderId} not found.`);
+		}
+
+		// Parse market ID from "Market X"
+		const marketId = Number.parseInt(order.market.replace("Market ", ""), 10);
+		const orderIdInt = Number.parseInt(order.id, 16);
+
+		const hash = await cancelPerpOrder(
+			subaccount.address,
+			marketId,
+			orderIdInt,
+		);
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
+
+		console.log();
+		consola.success("Order cancelled");
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to cancel order: ${(error as Error).message}`);
+	}
 }
 
 /**
@@ -189,12 +229,46 @@ ${marketFilter ? `Market: ${marketFilter}` : "All markets"}`,
 
 	consola.start("Cancelling orders...");
 
-	// Simulate transaction
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+	try {
+		const subaccounts = await getUserSubaccounts(address);
+		const subaccount = subaccounts[0];
+		if (!subaccount) throw new Error("No subaccount found.");
 
-	console.log();
-	consola.success(`${orders.length} order(s) cancelled`);
-	console.log();
+		const client = getPublicClient();
+		let successCount = 0;
+
+		for (const order of orders) {
+			try {
+				const marketId = Number.parseInt(
+					order.market.replace("Market ", ""),
+					10,
+				);
+				const orderIdInt = Number.parseInt(order.id, 16);
+
+				const hash = await cancelPerpOrder(
+					subaccount.address,
+					marketId,
+					orderIdInt,
+				);
+				await client.waitForTransactionReceipt({ hash });
+				successCount++;
+			} catch (e) {
+				consola.warn(
+					`Failed to cancel order ${order.id}: ${(e as Error).message}`,
+				);
+			}
+		}
+
+		console.log();
+		if (successCount > 0) {
+			consola.success(`${successCount} order(s) cancelled`);
+		} else {
+			consola.warn("No orders were cancelled");
+		}
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to cancel orders: ${(error as Error).message}`);
+	}
 }
 
 /**

@@ -134,13 +134,13 @@ export async function run(_args: ParsedArgs): Promise<void> {
 	// Check balance
 	try {
 		const balance = await getBalance(address as `0x${string}`);
-		console.log(`  Balance: ${formatAmount(balance, 18)} ETH`);
+		console.log(`  Balance: ${formatAmount(balance, 18)} tDGAS`);
 
 		if (balance === 0n) {
 			console.log();
-			consola.warn("Your wallet has no ETH for gas fees.");
-			console.log(dim("  Send some testnet ETH to this address, or use:"));
-			console.log(dim("  $ deepdex faucet --token ETH"));
+			consola.warn("Your wallet has no tDGAS for gas fees.");
+			console.log(dim("  Send some testnet tDGAS to this address, or use:"));
+			console.log(dim("  $ deepdex faucet --token tDGAS"));
 		}
 	} catch {
 		console.log(`  Balance: ${dim("Unable to fetch")}`);

@@ -23,7 +23,6 @@ export const LENDING_MARKET_ID = 1;
 
 export const DEFAULT_CONFIG = {
 	default_account: "main",
-	rpc_url: "https://rpc-testnet.deepdex.finance",
 	confirmations: true,
 	output_format: "table" as const,
 	notifications: {

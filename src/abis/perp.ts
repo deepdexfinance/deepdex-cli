@@ -371,11 +371,6 @@ export const PerpABI = [
 						type: "bytes",
 					},
 					{
-						internalType: "address",
-						name: "base_address",
-						type: "address",
-					},
-					{
 						internalType: "int32",
 						name: "base_decimal",
 						type: "int32",
@@ -471,6 +466,26 @@ export const PerpABI = [
 						internalType: "uint128",
 						name: "short_open_pos_num",
 						type: "uint128",
+					},
+					{
+						internalType: "int128",
+						name: "base_interest_rate",
+						type: "int128",
+					},
+					{
+						internalType: "uint128",
+						name: "impact_margin_value",
+						type: "uint128",
+					},
+					{
+						internalType: "int128",
+						name: "funding_rate_change_cap",
+						type: "int128",
+					},
+					{
+						internalType: "int128",
+						name: "funding_rate_change_floor",
+						type: "int128",
 					},
 				],
 				internalType: "struct Perp.PerpMarket",

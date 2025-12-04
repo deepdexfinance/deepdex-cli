@@ -3,7 +3,17 @@
  */
 
 import { consola } from "consola";
-import { findMarket, getPositions } from "../../services/client.ts";
+import { parseUnits } from "viem";
+import { network } from "../../abis/config.ts";
+import {
+	closePosition,
+	findMarket,
+	getPositions,
+	getPublicClient,
+	getUserSubaccounts,
+	modifyTpSl,
+	placePerpOrder,
+} from "../../services/client.ts";
 import {
 	getStoredAddress,
 	isUnlocked,
@@ -177,6 +187,10 @@ export async function close(args: ParsedArgs): Promise<void> {
 		throw new Error(`Market not found: ${pair}`);
 	}
 
+	if (!market.tokens[0]) {
+		throw new Error("Invalid market configuration: missing base token");
+	}
+
 	const size = getFlag<string>(args.raw, "size");
 
 	console.log();
@@ -203,13 +217,55 @@ Size: ${size || "Full position"}`,
 
 	consola.start("Closing position...");
 
-	// Simulate transaction
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+	try {
+		const address = getStoredAddress()!;
+		const subaccounts = await getUserSubaccounts(address);
+		const subaccount = subaccounts[0];
+		if (!subaccount) throw new Error("No subaccount found.");
 
-	console.log();
-	consola.success(`Position closed: ${market.value}`);
-	console.log(dim("  Realized PnL: +$0.00 (simulated)"));
-	console.log();
+		const marketId = Number.parseInt(market.pairId, 10);
+		let hash: `0x${string}`;
+
+		if (size) {
+			// Partial close
+			const positions = await getPositions(address);
+			const position = positions.find(
+				(p) => p.market.toUpperCase() === market.value.toUpperCase(),
+			);
+			if (!position) throw new Error("No open position to close.");
+
+			const isLong = !position.isLong; // Opposite side
+			const sizeBigInt = parseUnits(size, market.tokens[0].decimals);
+
+			hash = await placePerpOrder({
+				subaccount: subaccount.address,
+				marketId,
+				isLong,
+				size: sizeBigInt,
+				price: 0n,
+				orderType: 0,
+				leverage: position.leverage,
+				takeProfit: 0n,
+				stopLoss: 0n,
+				reduceOnly: true,
+				postOnly: 0,
+			});
+		} else {
+			// Full close
+			hash = await closePosition(subaccount.address, marketId, 0n, 0n);
+		}
+
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
+
+		console.log();
+		consola.success(`Position closed: ${market.value}`);
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to close position: ${(error as Error).message}`);
+	}
 }
 
 /**
@@ -258,12 +314,34 @@ ${sl ? `Stop Loss: $${sl}` : ""}`,
 
 	consola.start("Updating position...");
 
-	// Simulate transaction
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+	try {
+		const address = getStoredAddress()!;
+		const subaccounts = await getUserSubaccounts(address);
+		const subaccount = subaccounts[0];
+		if (!subaccount) throw new Error("No subaccount found.");
 
-	console.log();
-	consola.success(`Position updated: ${market.value}`);
-	console.log();
+		const marketId = Number.parseInt(market.pairId, 10);
+
+		const tpBigInt = tp ? parseUnits(tp, market.priceDecimal) : 0n;
+		const slBigInt = sl ? parseUnits(sl, market.priceDecimal) : 0n;
+
+		const hash = await modifyTpSl(
+			subaccount.address,
+			marketId,
+			tpBigInt,
+			slBigInt,
+		);
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
+
+		console.log();
+		consola.success(`Position updated: ${market.value}`);
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to update position: ${(error as Error).message}`);
+	}
 }
 
 // ============================================================================

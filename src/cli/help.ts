@@ -79,7 +79,7 @@ const COMMANDS: Record<string, CommandHelp> = {
 		usage: "deepdex account deposit <amount> <token>",
 		examples: [
 			"deepdex account deposit 1000 USDC",
-			"deepdex account deposit 0.5 ETH --account trading-main",
+			"deepdex account deposit 0.5 tDGAS --account trading-main",
 		],
 		options: [{ flag: "--account, -a", description: "Target subaccount name" }],
 	},
@@ -91,8 +91,8 @@ const COMMANDS: Record<string, CommandHelp> = {
 	},
 	faucet: {
 		description: "Mint testnet tokens",
-		usage: "deepdex faucet [--token <USDC|ETH>]",
-		examples: ["deepdex faucet", "deepdex faucet --token ETH"],
+		usage: "deepdex faucet [--token <USDC|tDGAS>]",
+		examples: ["deepdex faucet", "deepdex faucet --token tDGAS"],
 		options: [
 			{ flag: "--token", description: "Token to mint (default: USDC)" },
 		],

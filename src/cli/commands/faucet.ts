@@ -21,7 +21,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 	const address = getStoredAddress()!;
 
 	// Validate token
-	const validTokens = ["USDC", "ETH", "SOL"];
+	const validTokens = ["USDC", "tDGAS", "SOL"];
 	if (!validTokens.includes(token)) {
 		throw new Error(
 			`Invalid token: ${token}. Available: ${validTokens.join(", ")}`,
@@ -50,7 +50,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 
 	const amounts: Record<string, string> = {
 		USDC: "10,000",
-		ETH: "1.0",
+		tDGAS: "1.0",
 		SOL: "100",
 	};
 

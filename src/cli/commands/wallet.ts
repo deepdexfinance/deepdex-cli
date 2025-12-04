@@ -30,8 +30,8 @@ export async function info(args: ParsedArgs): Promise<void> {
 	consola.start("Fetching wallet info...");
 
 	const [balance, nonce] = await Promise.all([
-		getBalance(address),
-		getNonce(address),
+		getBalance(address as `0x${string}`),
+		getNonce(address as `0x${string}`),
 	]);
 
 	if (args.flags.json) {
@@ -66,7 +66,7 @@ export async function info(args: ParsedArgs): Promise<void> {
 		keyValue(
 			{
 				Address: address,
-				"ETH Balance": `${formatAmount(balance, 18, 6)} ETH`,
+				"tDGAS Balance": `${formatAmount(balance, 18, 6)} tDGAS`,
 				Nonce: nonce.toString(),
 			},
 			2,
@@ -75,7 +75,9 @@ export async function info(args: ParsedArgs): Promise<void> {
 
 	if (balance === 0n) {
 		console.log();
-		consola.warn("No ETH for gas. Get some with: deepdex faucet --token ETH");
+		consola.warn(
+			"No tDGAS for gas. Get some with: deepdex faucet --token tDGAS",
+		);
 	}
 
 	console.log();

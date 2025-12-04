@@ -17,7 +17,6 @@ import { LendingABI } from "../abis/lending.ts";
 import { PerpABI } from "../abis/perp.ts";
 import { SpotABI } from "../abis/spot.ts";
 import { SubaccountABI } from "../abis/subaccount.ts";
-import { loadConfig } from "../config/index.ts";
 import type {
 	ActiveOrder,
 	MarketPair,
@@ -35,11 +34,11 @@ import { getAccount } from "./wallet.ts";
 // ============================================================================
 
 export const deepdexTestnet: Chain = {
-	id: 8453, // Placeholder chain ID
+	id: 483, // Placeholder chain ID
 	name: network.name,
 	nativeCurrency: {
-		name: "ETH",
-		symbol: "ETH",
+		name: "tDGAS",
+		symbol: "tDGAS",
 		decimals: 18,
 	},
 	rpcUrls: {
@@ -59,10 +58,9 @@ let walletClient: WalletClient | null = null;
  */
 export function getPublicClient(): PublicClient {
 	if (!publicClient) {
-		const config = loadConfig();
 		publicClient = createPublicClient({
 			chain: deepdexTestnet,
-			transport: http(config.rpc_url),
+			transport: http(deepdexTestnet.rpcUrls.default.http[0]),
 		});
 	}
 	return publicClient;
@@ -73,12 +71,11 @@ export function getPublicClient(): PublicClient {
  */
 export function getWalletClient(): WalletClient {
 	if (!walletClient) {
-		const config = loadConfig();
 		const account = getAccount();
 		walletClient = createWalletClient({
 			account,
 			chain: deepdexTestnet,
-			transport: http(config.rpc_url),
+			transport: http(deepdexTestnet.rpcUrls.default.http[0]),
 		});
 	}
 	return walletClient;
@@ -294,7 +291,8 @@ export async function getOraclePrices(): Promise<OraclePrice[]> {
 	return prices.map((p) => ({
 		symbol: Buffer.from(p.symbol.slice(2), "hex")
 			.toString("utf8")
-			.replace(/\0/g, ""),
+			.replace(/\0/g, "")
+			.toUpperCase(),
 		price: p.price,
 	}));
 }
@@ -600,7 +598,6 @@ export async function placeSpotMarketBuy(params: {
 }): Promise<Hex> {
 	const client = getWalletClient();
 	const account = getAccount();
-
 	const hash = await client.writeContract({
 		address: network.contracts.spot as Address,
 		abi: SpotABI,
@@ -752,6 +749,66 @@ export async function getTokenBalance(
 	}) as Promise<bigint>;
 }
 
+/**
+ * Get token allowance
+ */
+export async function getAllowance(
+	token: Address,
+	owner: Address,
+	spender: Address,
+): Promise<bigint> {
+	const client = getPublicClient();
+	return client.readContract({
+		address: token,
+		abi: [
+			{
+				inputs: [
+					{ name: "owner", type: "address" },
+					{ name: "spender", type: "address" },
+				],
+				name: "allowance",
+				outputs: [{ name: "", type: "uint256" }],
+				stateMutability: "view",
+				type: "function",
+			},
+		],
+		functionName: "allowance",
+		args: [owner, spender],
+	}) as Promise<bigint>;
+}
+
+/**
+ * Approve token spending
+ */
+export async function approveToken(
+	token: Address,
+	spender: Address,
+	amount: bigint,
+): Promise<Hex> {
+	const client = getWalletClient();
+	const account = getAccount();
+
+	return client.writeContract({
+		address: token,
+		abi: [
+			{
+				inputs: [
+					{ name: "spender", type: "address" },
+					{ name: "amount", type: "uint256" },
+				],
+				name: "approve",
+				outputs: [{ name: "", type: "bool" }],
+				stateMutability: "nonpayable",
+				type: "function",
+			},
+		],
+		functionName: "approve",
+		args: [spender, amount],
+		account,
+		chain: deepdexTestnet,
+	});
+}
+
 // ============================================================================
 // Convenience Aliases and Helper Functions
 // ============================================================================
@@ -844,7 +901,7 @@ export const cancelOrder = cancelPerpOrder;
 /**
  * Place spot order helper
  */
-export async function placeSpotOrder(params: {
+export async function placeSpotOrder(_params: {
 	pair: string;
 	side: "buy" | "sell";
 	amount: bigint;
@@ -873,7 +930,7 @@ export async function depositToSubaccount(
 
 	// Convert token symbol to bytes
 	const assetBytes =
-		`0x${Buffer.from(token.toUpperCase()).toString("hex")}` as Hex;
+		`0x${Buffer.from(token.toLowerCase()).toString("hex")}` as Hex;
 
 	const hash = await client.writeContract({
 		address: network.contracts.lending as Address,

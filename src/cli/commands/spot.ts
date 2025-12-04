@@ -2,14 +2,27 @@
  * Spot trading commands
  */
 
+import BigNumber from "bignumber.js";
 import { consola } from "consola";
-import { findMarket } from "../../services/client.ts";
+import { formatUnits, type Hex, parseUnits } from "viem";
+import { network } from "../../abis/config.ts";
+import { loadConfig } from "../../config/index.ts";
 import {
+	findMarket,
+	getOraclePrices,
+	getUserSubaccounts,
+	placeSpotBuyOrder,
+	placeSpotMarketBuy,
+	placeSpotMarketSell,
+	placeSpotSellOrder,
+} from "../../services/client.ts";
+import {
+	getAccount,
 	isUnlocked,
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
-import { dim, formatSide } from "../../utils/format.ts";
+import { dim, formatSide, formatToSize } from "../../utils/format.ts";
 import { confirm, promptPassword } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
@@ -43,7 +56,9 @@ async function executeSpotOrder(
 	const price = getFlag<string>(args.raw, "price");
 	const postOnly = getFlag<boolean>(args.raw, "post-only") || false;
 	const reduceOnly = getFlag<boolean>(args.raw, "reduce-only") || false;
-	const accountName = getFlag<string>(args.raw, "account") || "default";
+	const config = loadConfig();
+	const accountName =
+		getFlag<string>(args.raw, "account") || config.default_account || "main";
 
 	// Find market
 	const market = findMarket(pair);
@@ -57,7 +72,10 @@ async function executeSpotOrder(
 		);
 	}
 
-	const orderType = price ? "limit" : "market";
+	const finalAmount = formatToSize(amount, market.stepSize);
+	const finalPrice = price ? formatToSize(price, market.tickSize) : undefined;
+
+	const orderType = finalPrice ? "limit" : "market";
 	const _sideColor = side === "buy" ? "\x1b[32m" : "\x1b[31m";
 	const _resetColor = "\x1b[0m";
 
@@ -65,9 +83,9 @@ async function executeSpotOrder(
 	consola.box({
 		title: `📈 Spot ${side.toUpperCase()}`,
 		message: `Market: ${market.value}
-Size: ${amount} ${market.tokens[0]?.symbol || ""}
+Size: ${finalAmount} ${market.tokens[0]?.symbol || ""}
 Type: ${orderType.toUpperCase()}
-${price ? `Price: $${price}` : ""}
+${finalPrice ? `Price: $${finalPrice}` : ""}
 ${postOnly ? "Post-Only: Yes" : ""}
 ${reduceOnly ? "Reduce-Only: Yes" : ""}
 Account: ${accountName}`,
@@ -96,10 +114,129 @@ Account: ${accountName}`,
 
 	consola.start("Submitting order...");
 
-	// Simulate order execution
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+	let txHash: Hex;
 
-	const orderId = `0x${Math.random().toString(16).slice(2, 10)}...`;
+	try {
+		const account = getAccount();
+		const subaccounts = await getUserSubaccounts(account.address);
+		const subaccount = subaccounts.find((s) => s.name === accountName);
+
+		if (!subaccount) {
+			throw new Error(
+				`Subaccount '${accountName}' not found. Create it first with 'deepdex account create ${accountName}'`,
+			);
+		}
+
+		const baseToken = market.tokens[0];
+		const quoteToken = market.tokens[1];
+
+		if (!baseToken || !quoteToken) {
+			throw new Error("Invalid market configuration: missing tokens");
+		}
+
+		const baseAmount = parseUnits(finalAmount, baseToken.decimals);
+		let quoteAmount = 0n;
+
+		if (finalPrice) {
+			// Limit Order
+			const amountBN = new BigNumber(finalAmount);
+			const priceBN = new BigNumber(finalPrice);
+			const quoteBN = amountBN.times(priceBN);
+
+			quoteAmount = parseUnits(
+				quoteBN.toFixed(quoteToken.decimals),
+				quoteToken.decimals,
+			);
+
+			if (side === "buy") {
+				txHash = await placeSpotBuyOrder({
+					subaccount: subaccount.address,
+					pairId: market.pairId as Hex,
+					quoteAmount,
+					baseAmount,
+					postOnly: postOnly ? 1 : 0,
+					reduceOnly,
+				});
+			} else {
+				txHash = await placeSpotSellOrder({
+					subaccount: subaccount.address,
+					pairId: market.pairId as Hex,
+					quoteAmount,
+					baseAmount,
+					postOnly: postOnly ? 1 : 0,
+					reduceOnly,
+				});
+			}
+		} else {
+			// Market Order
+			const prices = await getOraclePrices();
+			const oraclePrice = prices.find(
+				(p) => p.symbol === baseToken.symbol,
+			)?.price;
+			if (!oraclePrice) {
+				// Fallback to market.price if oracle not found, though risky
+				const marketPrice = new BigNumber(market.price || "0");
+				if (marketPrice.isZero()) {
+					throw new Error("Could not determine market price for market order");
+				}
+				// Use market price
+				const slippage = new BigNumber(0.05); // 5%
+				const amountBN = new BigNumber(finalAmount);
+
+				const estimatedQuote =
+					side === "buy"
+						? amountBN.times(marketPrice).times(slippage.plus(1))
+						: amountBN
+								.times(marketPrice)
+								.times(new BigNumber(1).minus(slippage));
+
+				quoteAmount = parseUnits(
+					formatToSize(estimatedQuote, market.stepSize),
+					quoteToken.decimals,
+				);
+			} else {
+				// Use oracle price
+				const priceBN = new BigNumber(formatUnits(oraclePrice, 6));
+				const slippage = new BigNumber(0.05); // 5%
+				const amountBN = new BigNumber(finalAmount);
+
+				const estimatedQuote =
+					side === "buy"
+						? amountBN.times(priceBN).times(slippage.plus(1))
+						: amountBN.times(priceBN).times(new BigNumber(1).minus(slippage));
+
+				quoteAmount = parseUnits(
+					formatToSize(estimatedQuote, market.stepSize),
+					quoteToken.decimals,
+				);
+			}
+
+			if (side === "buy") {
+				txHash = await placeSpotMarketBuy({
+					subaccount: subaccount.address,
+					pairId: market.pairId as Hex,
+					quoteAmount,
+					baseAmount,
+					autoCancel: true,
+					reduceOnly,
+				});
+			} else {
+				txHash = await placeSpotMarketSell({
+					subaccount: subaccount.address,
+					pairId: market.pairId as Hex,
+					quoteAmount,
+					baseAmount,
+					autoCancel: true,
+					reduceOnly,
+				});
+			}
+		}
+	} catch (error) {
+		consola.error(error);
+		return;
+	}
+
+	const orderId = txHash;
 
 	console.log();
 	consola.success(
@@ -107,6 +244,8 @@ Account: ${accountName}`,
 	);
 	console.log();
 	console.log(dim("  Order ID:  ") + orderId);
+	const explorerUrl = `${network.explorer}/tx/${txHash}`;
+	console.log(dim(`  Transaction: ${explorerUrl}`));
 	console.log(
 		dim("  Status:    ") + (orderType === "market" ? "Filled" : "Open"),
 	);

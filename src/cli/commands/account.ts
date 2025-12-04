@@ -3,8 +3,16 @@
  */
 
 import { consola } from "consola";
+import { type Address, parseUnits } from "viem";
 import { network } from "../../abis/config.ts";
-import { getSubaccounts } from "../../services/client.ts";
+import {
+	createSubaccount,
+	depositToSubaccount,
+	getPublicClient,
+	getSubaccounts,
+	setDelegate,
+	withdrawFromSubaccount,
+} from "../../services/client.ts";
 import {
 	getStoredAddress,
 	isUnlocked,
@@ -27,7 +35,7 @@ export async function create(args: ParsedArgs): Promise<void> {
 	ensureWallet();
 	await ensureUnlocked();
 
-	const name = optionalArg(args.positional, 0, "main");
+	const name = optionalArg(args.positional, 0, "main")!;
 
 	console.log();
 	consola.box({
@@ -52,16 +60,22 @@ export async function create(args: ParsedArgs): Promise<void> {
 
 	consola.start("Creating subaccount on-chain...");
 
-	// In production, this would call the contract
-	// For now, show simulated output
-	await new Promise((resolve) => setTimeout(resolve, 1000));
+	try {
+		const hash = await createSubaccount(name);
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
 
-	console.log();
-	consola.success(`Subaccount "${name}" created!`);
-	console.log(
-		dim(`  Next: deepdex account deposit 1000 USDC --account ${name}`),
-	);
-	console.log();
+		console.log();
+		consola.success(`Subaccount "${name}" created!`);
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log(
+			dim(`  Next: deepdex account deposit 1000 USDC --account ${name}`),
+		);
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to create subaccount: ${(error as Error).message}`);
+	}
 }
 
 /**
@@ -78,7 +92,7 @@ export async function list(args: ParsedArgs): Promise<void> {
 	try {
 		subaccounts = await getSubaccounts(address);
 	} catch {
-		// In testnet, might not have any
+		consola.warn("Failed to fetch subaccounts.");
 	}
 
 	if (args.flags.json) {
@@ -106,8 +120,8 @@ export async function list(args: ParsedArgs): Promise<void> {
 		const tableData = subaccounts.map((acc, i) => ({
 			"#": (i + 1).toString(),
 			Name: acc.name || `Account ${i + 1}`,
-			ID: truncateAddress(acc.id as `0x${string}`),
-			Status: acc.active ? "Active" : "Inactive",
+			ID: truncateAddress(acc.address as `0x${string}`),
+			Status: "Active",
 		}));
 
 		console.log(
@@ -195,26 +209,36 @@ export async function deposit(args: ParsedArgs): Promise<void> {
 	ensureWallet();
 	await ensureUnlocked();
 
-	const amount = requireArg(args.positional, 0, "amount");
-	const token = requireArg(args.positional, 1, "token").toUpperCase();
+	const amountStr = requireArg(args.positional, 0, "amount");
+	const tokenSymbol = requireArg(args.positional, 1, "token").toUpperCase();
 	const accountName = getFlag<string>(args.raw, "account") || "default";
 
 	// Validate token
 	const tokenInfo = Object.values(network.tokens).find(
-		(t) => t.symbol.toUpperCase() === token,
+		(t) => t.symbol.toUpperCase() === tokenSymbol,
 	);
 	if (!tokenInfo) {
 		throw new Error(
-			`Unknown token: ${token}. Available: ${Object.values(network.tokens)
+			`Unknown token: ${tokenSymbol}. Available: ${Object.values(network.tokens)
 				.map((t) => t.symbol)
 				.join(", ")}`,
 		);
 	}
 
+	const owner = getStoredAddress()!;
+	const subaccounts = await getSubaccounts(owner);
+	const subaccount = subaccounts.find((s) => s.name === accountName);
+
+	if (!subaccount) {
+		throw new Error(`Subaccount "${accountName}" not found.`);
+	}
+
+	const amount = parseUnits(amountStr, tokenInfo.decimals);
+
 	console.log();
 	consola.box({
 		title: "💰 Deposit",
-		message: `Deposit ${amount} ${token} to "${accountName}"`,
+		message: `Deposit ${amountStr} ${tokenSymbol} to "${accountName}"`,
 		style: {
 			padding: 1,
 			borderColor: "green",
@@ -225,22 +249,51 @@ export async function deposit(args: ParsedArgs): Promise<void> {
 	// Confirm
 	if (!args.flags.yes) {
 		console.log();
-		const confirmed = await confirm(`Deposit ${amount} ${token}?`, true);
+		const confirmed = await confirm(
+			`Deposit ${amountStr} ${tokenSymbol}?`,
+			true,
+		);
 		if (!confirmed) {
 			consola.info("Cancelled.");
 			return;
 		}
 	}
 
-	consola.start("Processing deposit...");
+	try {
+		// consola.start("Checking allowance...");
+		// const allowance = await getAllowance(tokenAddress, owner, lendingContract);
 
-	// Simulate transaction
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+		// if (allowance < amount) {
+		// 	consola.info(`Approving ${tokenSymbol}...`);
+		// 	const approveHash = await approveToken(
+		// 		tokenAddress,
+		// 		lendingContract,
+		// 		amount,
+		// 	);
+		// 	const client = getPublicClient();
+		// 	await client.waitForTransactionReceipt({ hash: approveHash });
+		// 	consola.success("Approved!");
+		// }
 
-	console.log();
-	consola.success(`Deposited ${amount} ${token} to "${accountName}"`);
-	console.log(dim("  Transaction confirmed"));
-	console.log();
+		consola.start("Processing deposit...");
+		const hash = await depositToSubaccount(
+			subaccount.address,
+			tokenSymbol,
+			amount,
+		);
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
+
+		console.log();
+		consola.success(
+			`Deposited ${amountStr} ${tokenSymbol} to "${accountName}"`,
+		);
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to deposit: ${(error as Error).message}`);
+	}
 }
 
 /**
@@ -283,15 +336,36 @@ export async function withdraw(args: ParsedArgs): Promise<void> {
 		}
 	}
 
+	const owner = getStoredAddress()!;
+	const subaccounts = await getSubaccounts(owner);
+	const subaccount = subaccounts.find((s) => s.name === accountName);
+
+	if (!subaccount) {
+		throw new Error(`Subaccount "${accountName}" not found.`);
+	}
+
+	const amountBigInt = parseUnits(amount, tokenInfo.decimals);
+
 	consola.start("Processing withdrawal...");
 
-	// Simulate transaction
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+	try {
+		const hash = await withdrawFromSubaccount(
+			subaccount.address,
+			token,
+			amountBigInt,
+		);
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
 
-	console.log();
-	consola.success(`Withdrew ${amount} ${token} from "${accountName}"`);
-	console.log(dim("  Funds returned to your wallet"));
-	console.log();
+		console.log();
+		consola.success(`Withdrew ${amount} ${token} from "${accountName}"`);
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log(dim("  Funds returned to your wallet"));
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to withdraw: ${(error as Error).message}`);
+	}
 }
 
 /**
@@ -335,17 +409,32 @@ To: ${delegateTo}`,
 		}
 	}
 
+	const owner = getStoredAddress()!;
+	const subaccounts = await getSubaccounts(owner);
+	const subaccount = subaccounts.find((s) => s.name === accountName);
+
+	if (!subaccount) {
+		throw new Error(`Subaccount "${accountName}" not found.`);
+	}
+
 	consola.start("Setting delegation...");
 
-	// Simulate transaction
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+	try {
+		const hash = await setDelegate(subaccount.address, delegateTo as Address);
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
 
-	console.log();
-	consola.success("Delegation set successfully");
-	console.log(
-		dim(`  ${delegateTo} can now trade on behalf of "${accountName}"`),
-	);
-	console.log();
+		console.log();
+		consola.success("Delegation set successfully");
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log(
+			dim(`  ${delegateTo} can now trade on behalf of "${accountName}"`),
+		);
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to set delegate: ${(error as Error).message}`);
+	}
 }
 
 // ============================================================================

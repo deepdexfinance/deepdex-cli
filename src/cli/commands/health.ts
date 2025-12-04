@@ -76,18 +76,18 @@ export async function run(args: ParsedArgs): Promise<void> {
 		if (walletExists()) {
 			const address = getStoredAddress();
 			try {
-				const balance = await getBalance(address!);
+				const balance = await getBalance(address! as `0x${string}`);
 				const ethBalance = Number(formatAmount(balance, 18, 4));
 
 				let status: HealthStatus = "ok";
-				let details = `${ethBalance} ETH (gas)`;
+				let details = `${ethBalance} tDGAS (gas)`;
 
 				if (ethBalance < 0.001) {
 					status = "critical";
-					details = "Very low ETH balance!";
+					details = "Very low tDGAS balance!";
 				} else if (ethBalance < 0.01) {
 					status = "warning";
-					details = "Low ETH balance";
+					details = "Low tDGAS balance";
 				}
 
 				checks.push({

@@ -19,6 +19,21 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
+# Cleanup on interrupt
+cleanup() {
+    exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        echo -e "\n${YELLOW}⚠  Installation interrupted or failed.${NC}"
+    fi
+    # Remove temp files if any (we might define a temp dir later)
+    if [ -n "${TEMP_DIR:-}" ] && [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
+    fi
+    exit $exit_code
+}
+
+trap cleanup INT TERM EXIT
+
 # Print functions
 print_banner() {
     echo -e "${CYAN}"
@@ -74,6 +89,36 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Robust downloader that handles snap curl issues
+downloader() {
+    local url="$1"
+    local output_file="$2"
+
+    # Check if we have a broken snap curl
+    # https://github.com/boukendesho/curl-snap/issues/1
+    local snap_curl=0
+    if command_exists curl; then
+        local curl_path
+        curl_path=$(command -v curl)
+        if [[ "$curl_path" == *"/snap/"* ]]; then
+            snap_curl=1
+        fi
+    fi
+
+    # Check if we have a working (non-snap) curl
+    if command_exists curl && [[ $snap_curl -eq 0 ]]; then
+        curl -fsSL "$url" -o "$output_file"
+    # Try wget for both no curl and the broken snap curl
+    elif command_exists wget; then
+        wget -qO "$output_file" "$url"
+    # If we can't fall back from broken snap curl to wget, report the broken snap curl
+    elif [[ $snap_curl -eq 1 ]]; then
+        error "curl installed with snap cannot download files due to missing permissions. Please uninstall it and reinstall curl with a different package manager (e.g., apt). See https://github.com/boukendesho/curl-snap/issues/1"
+    else
+        error "Neither curl nor wget found. Please install one of them."
+    fi
+}
+
 # Install Bun
 install_bun() {
     step "Installing Bun runtime..."
@@ -87,13 +132,15 @@ install_bun() {
     
     info "Bun not found. Installing..."
     
-    if command_exists curl; then
-        curl -fsSL https://bun.sh/install | bash
-    elif command_exists wget; then
-        wget -qO- https://bun.sh/install | bash
-    else
-        error "Neither curl nor wget found. Please install one of them first."
-    fi
+    # Create a temp file for the installer
+    TEMP_DIR=$(mktemp -d)
+    local install_script="$TEMP_DIR/install-bun.sh"
+    
+    downloader "https://bun.sh/install" "$install_script"
+    chmod +x "$install_script"
+    
+    # Run the installer
+    bash "$install_script"
     
     # Source bun into current shell
     export BUN_INSTALL="$HOME/.bun"
@@ -301,4 +348,3 @@ main() {
 
 # Run main
 main "$@"
-

@@ -3,14 +3,27 @@
  */
 
 import { consola } from "consola";
-import { findMarket } from "../../services/client.ts";
+import { parseUnits } from "viem";
+import { network } from "../../abis/config.ts";
 import {
+	findMarket,
+	getPublicClient,
+	getUserSubaccounts,
+	placePerpOrder,
+} from "../../services/client.ts";
+import {
+	getAccount,
 	isUnlocked,
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
 import { MAX_LEVERAGE } from "../../utils/constants.ts";
-import { dim, formatLeverage, formatSide } from "../../utils/format.ts";
+import {
+	dim,
+	formatLeverage,
+	formatSide,
+	formatToSize,
+} from "../../utils/format.ts";
 import { confirm, promptPassword } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
@@ -57,6 +70,10 @@ async function executePerpOrder(
 		throw new Error(`Market not found: ${pair}`);
 	}
 
+	if (!market.tokens[0]) {
+		throw new Error("Invalid market configuration: missing base token");
+	}
+
 	if (!market.isPerp) {
 		throw new Error(
 			`${pair} is a spot market. Use 'deepdex spot' for spot trading.`,
@@ -72,18 +89,23 @@ async function executePerpOrder(
 		throw new Error(`Max leverage for ${pair} is ${market.leverage}x`);
 	}
 
-	const orderType = price ? "limit" : "market";
+	const finalAmount = formatToSize(amount, market.stepSize);
+	const finalPrice = price ? formatToSize(price, market.tickSize) : undefined;
+	const finalTp = tp ? formatToSize(tp, market.tickSize) : undefined;
+	const finalSl = sl ? formatToSize(sl, market.tickSize) : undefined;
+
+	const orderType = finalPrice ? "limit" : "market";
 
 	console.log();
 	consola.box({
 		title: `📊 Perpetual ${side.toUpperCase()}`,
 		message: `Market: ${market.value}
-Size: ${amount} ${market.tokens[0]?.symbol || ""}
+Size: ${finalAmount} ${market.tokens[0]?.symbol || ""}
 Leverage: ${formatLeverage(leverage)}
 Type: ${orderType.toUpperCase()}
-${price ? `Price: $${price}` : ""}
-${tp ? `Take Profit: $${tp}` : ""}
-${sl ? `Stop Loss: $${sl}` : ""}
+${finalPrice ? `Price: $${finalPrice}` : ""}
+${finalTp ? `Take Profit: $${finalTp}` : ""}
+${finalSl ? `Stop Loss: $${finalSl}` : ""}
 ${reduceOnly ? "Reduce-Only: Yes" : ""}
 Account: ${accountName}`,
 		style: {
@@ -96,13 +118,16 @@ Account: ${accountName}`,
 	// Risk warning for high leverage
 	if (leverage >= 10) {
 		console.log();
-		consola.warn(`High leverage (${leverage}x) increases liquidation risk!`);
+		consola.warn(`High leverage(${leverage}x) increases liquidation risk!`);
 	}
 
 	// Confirm if not dry-run or --yes
 	if (!args.flags.dryRun && !args.flags.yes) {
 		console.log();
-		const confirmed = await confirm(`Open ${formatSide(side)} position?`, true);
+		const confirmed = await confirm(
+			`Open ${formatSide(side)} position ? `,
+			true,
+		);
 		if (!confirmed) {
 			consola.info("Order cancelled.");
 			return;
@@ -117,23 +142,57 @@ Account: ${accountName}`,
 
 	consola.start("Opening position...");
 
-	// Simulate order execution
-	await new Promise((resolve) => setTimeout(resolve, 1500));
+	try {
+		const account = getAccount();
+		const subaccounts = await getUserSubaccounts(account.address);
+		const subaccount = subaccounts.find((s) => s.name === accountName);
 
-	const positionId = `0x${Math.random().toString(16).slice(2, 10)}...`;
+		if (!subaccount) {
+			throw new Error(`Subaccount '${accountName}' not found.`);
+		}
 
-	console.log();
-	consola.success(`${side.toUpperCase()} position opened!`);
-	console.log();
-	console.log(dim("  Position ID: ") + positionId);
-	console.log(`${dim("  Size:        ")}${amount} ${market.tokens[0]?.symbol}`);
-	console.log(dim("  Leverage:    ") + formatLeverage(leverage));
-	console.log(
-		dim("  Status:      ") + (orderType === "market" ? "Active" : "Pending"),
-	);
-	console.log();
-	console.log(dim("  View: deepdex position list"));
-	console.log();
+		const marketId = Number.parseInt(market.pairId, 10);
+		const isLong = side === "long";
+		const sizeBigInt = parseUnits(finalAmount, market.tokens[0].decimals);
+
+		let priceBigInt = 0n;
+		if (finalPrice) {
+			priceBigInt = parseUnits(finalPrice, market.priceDecimal);
+		}
+
+		const tpBigInt = finalTp ? parseUnits(finalTp, market.priceDecimal) : 0n;
+		const slBigInt = finalSl ? parseUnits(finalSl, market.priceDecimal) : 0n;
+
+		const hash = await placePerpOrder({
+			subaccount: subaccount.address,
+			marketId,
+			isLong,
+			size: sizeBigInt,
+			price: priceBigInt,
+			orderType: finalPrice ? 1 : 0,
+			leverage,
+			takeProfit: tpBigInt,
+			stopLoss: slBigInt,
+			reduceOnly,
+			postOnly: 0,
+		});
+
+		const client = getPublicClient();
+		await client.waitForTransactionReceipt({ hash });
+
+		console.log();
+		consola.success(`${side.toUpperCase()} position opened!`);
+		const explorerUrl = `${network.explorer} / tx / ${hash}`;
+		console.log(dim(`  Transaction: ${explorerUrl}`));
+		console.log(
+			dim("  Status:      ") + (orderType === "market" ? "Filled" : "Open"),
+		);
+		console.log();
+		console.log(dim("  View: deepdex position list"));
+		console.log();
+	} catch (error) {
+		consola.error(`Failed to open position: ${(error as Error).message}`);
+	}
 }
 
 // ============================================================================

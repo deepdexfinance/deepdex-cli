@@ -3,6 +3,7 @@
  */
 
 import { consola } from "consola";
+import type { Address } from "viem";
 import { network } from "../../abis/config.ts";
 import {
 	getBalance,
@@ -33,15 +34,18 @@ export async function run(args: ParsedArgs): Promise<void> {
 
 	consola.start("Fetching balances...");
 
-	// Get ETH balance
-	const ethBalance = await getBalance(address);
+	// Get tDGAS balance
+	const ethBalance = await getBalance(address as Address);
 
 	// Get token balances
 	const tokenBalances: { symbol: string; balance: bigint; decimals: number }[] =
 		[];
 	for (const token of Object.values(network.tokens)) {
 		try {
-			const balance = await getTokenBalance(address, token.address);
+			const balance = await getTokenBalance(
+				address as Address,
+				token.address as Address,
+			);
 			tokenBalances.push({
 				symbol: token.symbol,
 				balance,
@@ -61,7 +65,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 			JSON.stringify(
 				{
 					wallet: address,
-					eth: ethBalance.toString(),
+					tDGAS: ethBalance.toString(),
 					tokens: tokenBalances.map((t) => ({
 						symbol: t.symbol,
 						balance: t.balance.toString(),
@@ -90,7 +94,7 @@ export async function run(args: ParsedArgs): Promise<void> {
 	// Wallet balances
 	const walletData = [
 		{
-			Token: "ETH",
+			Token: "tDGAS",
 			Balance: formatAmount(ethBalance, 18, 6),
 			USD: "-",
 		},

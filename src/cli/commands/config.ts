@@ -42,7 +42,6 @@ export async function show(args: ParsedArgs): Promise<void> {
 	// Flatten config for display
 	const flatConfig: Record<string, string> = {};
 
-	flatConfig.rpc_url = config.rpc_url;
 	flatConfig.default_account = config.default_account;
 
 	if (config.trading) {
