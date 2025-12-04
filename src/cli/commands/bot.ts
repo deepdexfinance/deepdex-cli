@@ -46,6 +46,11 @@ const STRATEGIES: {
 		description: "Simple DCA - dollar cost averaging at intervals",
 		riskLevel: "Low",
 	},
+	{
+		name: "momentum",
+		description: "Momentum - trend following using moving averages",
+		riskLevel: "High",
+	},
 ];
 
 // ============================================================================
@@ -151,9 +156,22 @@ Mode: ${daemon ? "Background (daemon)" : "Foreground"}`,
 		console.log(dim("  Press Ctrl+C to stop the bot."));
 		console.log();
 
-		// In production, this would start the actual bot loop
-		consola.info("Bot is running... (simulation mode)");
-		console.log(dim("  Watching for trading opportunities..."));
+		if (["simple", "grid", "momentum", "arbitrage"].includes(strategyName)) {
+			// Dynamic import to avoid circular dependencies if any
+			const { run } = await import(`./strategies/${strategyName}.ts`);
+			await run({
+				strategy: strategyName,
+				account: accountName,
+				config: botConfig,
+			});
+		} else {
+			// In production, this would start the actual bot loop
+			consola.info("Bot is running... (simulation mode)");
+			console.log(dim("  Watching for trading opportunities..."));
+
+			// Keep process alive for simulation
+			await new Promise(() => {});
+		}
 	}
 
 	console.log();

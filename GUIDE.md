@@ -345,8 +345,14 @@ deepdex bot start grid --config ./my-grid.json
 deepdex bot start mm --account bot-wallet
 ```
 
+**Available Strategies:**
+1. **Simple DCA (`simple`)**: Dollar-cost averaging.
+2. **Grid Trading (`grid`)**: Range-bound trading with inventory skewing.
+3. **Momentum (`momentum`)**: Trend following with moving averages.
+4. **Arbitrage (`arbitrage`)**: Funding rate arbitrage (Delta Neutral).
+
 **Options:**
-- `--strategy <name>` - Strategy: `grid`, `mm`, `arbitrage`, `simple`
+- `--strategy <name>` - Strategy: `grid`, `momentum`, `arbitrage`, `simple`
 - `--config <path>` - Path to strategy configuration file
 - `--account <name>` - Subaccount to use
 - `--daemon` - Run in background

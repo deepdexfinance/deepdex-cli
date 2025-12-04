@@ -272,7 +272,7 @@ export interface TradeOptions {
 // Bot Types
 // ============================================================================
 
-export type BotStrategy = "grid" | "mm" | "arbitrage" | "simple";
+export type BotStrategy = "grid" | "mm" | "arbitrage" | "simple" | "momentum";
 
 export interface BotConfig {
 	strategy: BotStrategy;

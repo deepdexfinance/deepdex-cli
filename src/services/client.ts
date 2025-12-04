@@ -976,6 +976,25 @@ export async function withdrawFromSubaccount(
 }
 
 /**
+ * Get subaccount balance (max withdraw amount)
+ */
+export async function getSubaccountBalance(
+	subaccount: Address,
+	token: string,
+): Promise<bigint> {
+	const client = getPublicClient();
+	const assetBytes =
+		`0x${Buffer.from(token.toUpperCase()).toString("hex")}` as Hex;
+
+	return client.readContract({
+		address: network.contracts.lending as Address,
+		abi: LendingABI,
+		functionName: "maxWithdrawAmountFor",
+		args: [subaccount, LENDING_MARKET_ID, assetBytes],
+	}) as Promise<bigint>;
+}
+
+/**
  * Borrow from subaccount
  * Borrows assets from the lending contract for a given subaccount
  * @param subaccount - The subaccount address to borrow from

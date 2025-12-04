@@ -72,6 +72,29 @@ deepdex bot start grid
   - Real-time Oracle price feeds
   - Backtesting support
 
+### 🤖 Strategies
+
+The bot comes with several built-in strategies that can be configured in `.deepdex/config.json`:
+
+1.  **Simple DCA (`simple`)**
+    *   Executes dollar-cost averaging by buying a fixed amount of an asset at regular intervals.
+    *   Good for long-term accumulation.
+
+2.  **Grid Trading (`grid`)**
+    *   Places buy and sell orders at fixed price intervals within a configured range.
+    *   **Inventory Skewing**: Automatically adjusts grid levels based on current inventory to manage risk (e.g., shifts levels down if holding too much inventory).
+    *   Best for sideways/ranging markets.
+
+3.  **Momentum (`momentum`)**
+    *   Trend-following strategy using Moving Averages (MA).
+    *   Longs when price is above MA, shorts when below.
+    *   Captures big trends but may suffer in choppy markets.
+
+4.  **Funding Rate Arbitrage (`arbitrage`)**
+    *   Exploits positive funding rates by shorting the perpetual contract and buying the spot asset (Delta Neutral).
+    *   Earns funding fees while hedging price risk.
+    *   Automatically sells spot position when closing the arbitrage.
+
 - **Developer Experience**
   - Built with [Bun](https://bun.sh) for speed
   - Type-safe with TypeScript + Zod
