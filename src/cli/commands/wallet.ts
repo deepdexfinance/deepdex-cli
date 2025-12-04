@@ -3,6 +3,7 @@
  */
 
 import { consola } from "consola";
+import { network } from "../../abis/config.ts";
 import { getBalance, getNonce } from "../../services/client.ts";
 import {
 	exportPrivateKey,
@@ -68,6 +69,7 @@ export async function info(args: ParsedArgs): Promise<void> {
 				Address: address,
 				"tDGAS Balance": `${formatAmount(balance, 18, 6)} tDGAS`,
 				Nonce: nonce.toString(),
+				Explorer: `${network.explorer}/address/${address}`,
 			},
 			2,
 		),

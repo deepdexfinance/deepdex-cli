@@ -86,7 +86,7 @@ export const perpPairs = [
 		leverage: 50,
 		tickSize: 0.01,
 		stepSize: 0.001,
-		pairId: "1", // MarketId
+		pairId: "2", // MarketId
 		disabled: false,
 	},
 	// {

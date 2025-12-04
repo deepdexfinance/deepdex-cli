@@ -5,6 +5,7 @@
 import { consola } from "consola";
 import { parseUnits } from "viem";
 import { network } from "../../abis/config.ts";
+import { loadConfig } from "../../config/index.ts";
 import {
 	findMarket,
 	getPublicClient,
@@ -62,7 +63,9 @@ async function executePerpOrder(
 	const tp = getFlag<string>(args.raw, "tp");
 	const sl = getFlag<string>(args.raw, "sl");
 	const reduceOnly = getFlag<boolean>(args.raw, "reduce-only") || false;
-	const accountName = getFlag<string>(args.raw, "account") || "default";
+	const config = loadConfig();
+	const accountName =
+		getFlag<string>(args.raw, "account") || config.default_account || "default";
 
 	// Find market
 	const market = findMarket(pair);
@@ -162,7 +165,6 @@ Account: ${accountName}`,
 
 		const tpBigInt = finalTp ? parseUnits(finalTp, market.priceDecimal) : 0n;
 		const slBigInt = finalSl ? parseUnits(finalSl, market.priceDecimal) : 0n;
-
 		const hash = await placePerpOrder({
 			subaccount: subaccount.address,
 			marketId,
@@ -182,7 +184,7 @@ Account: ${accountName}`,
 
 		console.log();
 		consola.success(`${side.toUpperCase()} position opened!`);
-		const explorerUrl = `${network.explorer} / tx / ${hash}`;
+		const explorerUrl = `${network.explorer}/ tx/ ${hash}`;
 		console.log(dim(`  Transaction: ${explorerUrl}`));
 		console.log(
 			dim("  Status:      ") + (orderType === "market" ? "Filled" : "Open"),
