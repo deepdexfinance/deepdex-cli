@@ -12,10 +12,13 @@ import { join } from "node:path";
 export const DEEPDEX_HOME = join(homedir(), ".deepdex");
 export const CONFIG_PATH = join(DEEPDEX_HOME, "config.json");
 export const WALLET_PATH = join(DEEPDEX_HOME, "wallet.json");
+export const WALLETS_PATH = join(DEEPDEX_HOME, "wallets.json");
 export const BOT_PID_PATH = join(DEEPDEX_HOME, "bot.pid");
 export const LOGS_DIR = join(DEEPDEX_HOME, "logs");
 export const BOT_LOG_PATH = join(LOGS_DIR, "bot.log");
 export const LENDING_MARKET_ID = 1;
+export const DEFAULT_WALLET_NAME = "default";
+export const WALLET_STORE_VERSION = 1;
 
 // ============================================================================
 // Default Configuration

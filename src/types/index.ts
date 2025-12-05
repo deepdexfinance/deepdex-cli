@@ -39,6 +39,13 @@ export interface StoredWallet {
 	salt: string;
 	iv: string;
 	createdAt: number;
+	name: string;
+}
+
+export interface WalletStore {
+	version: number;
+	activeWallet: string | null;
+	wallets: StoredWallet[];
 }
 
 // ============================================================================

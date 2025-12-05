@@ -120,7 +120,7 @@ export async function list(args: ParsedArgs): Promise<void> {
 		const tableData = subaccounts.map((acc, i) => ({
 			"#": (i + 1).toString(),
 			Name: acc.name || `Account ${i + 1}`,
-			ID: truncateAddress(acc.address as `0x${string}`),
+			ID: acc.address,
 			Status: "Active",
 		}));
 
@@ -260,21 +260,6 @@ export async function deposit(args: ParsedArgs): Promise<void> {
 	}
 
 	try {
-		// consola.start("Checking allowance...");
-		// const allowance = await getAllowance(tokenAddress, owner, lendingContract);
-
-		// if (allowance < amount) {
-		// 	consola.info(`Approving ${tokenSymbol}...`);
-		// 	const approveHash = await approveToken(
-		// 		tokenAddress,
-		// 		lendingContract,
-		// 		amount,
-		// 	);
-		// 	const client = getPublicClient();
-		// 	await client.waitForTransactionReceipt({ hash: approveHash });
-		// 	consola.success("Approved!");
-		// }
-
 		consola.start("Processing deposit...");
 		const hash = await depositToSubaccount(
 			subaccount.address,

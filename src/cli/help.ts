@@ -25,32 +25,92 @@ const COMMANDS: Record<string, CommandHelp> = {
 		examples: ["deepdex init", "deepdex init --import"],
 	},
 	wallet: {
-		description: "Wallet management commands",
+		description: "Multi-wallet management commands",
 		usage: "deepdex wallet <command>",
 		subcommands: [
+			{ name: "list", description: "List all wallets" },
 			{ name: "info", description: "Display wallet address and balances" },
+			{ name: "create", description: "Create a new wallet" },
+			{ name: "switch", description: "Switch active wallet" },
+			{ name: "rename", description: "Rename a wallet" },
+			{ name: "delete", description: "Delete a wallet" },
 			{
 				name: "export",
 				description: "Export private key (requires confirmation)",
 			},
 			{ name: "import", description: "Import wallet from private key" },
 			{ name: "sign", description: "Sign an arbitrary message" },
+			{
+				name: "transfer",
+				description: "Transfer tokens to another wallet or address",
+			},
 		],
+	},
+	"wallet list": {
+		description: "List all wallets with their addresses",
+		usage: "deepdex wallet list",
+		examples: ["deepdex wallet list", "deepdex wallet list --json"],
 	},
 	"wallet info": {
 		description: "Display wallet address, balance, and nonce",
-		usage: "deepdex wallet info",
-		examples: ["deepdex wallet info", "deepdex wallet info --json"],
+		usage: "deepdex wallet info [name]",
+		examples: [
+			"deepdex wallet info",
+			"deepdex wallet info trading",
+			"deepdex wallet info --json",
+		],
+	},
+	"wallet create": {
+		description: "Create a new wallet with optional name",
+		usage: "deepdex wallet create [name]",
+		examples: [
+			"deepdex wallet create",
+			"deepdex wallet create trading",
+			"deepdex wallet create bot-wallet",
+		],
+	},
+	"wallet switch": {
+		description: "Switch to a different wallet",
+		usage: "deepdex wallet switch <name>",
+		examples: [
+			"deepdex wallet switch trading",
+			"deepdex wallet switch default",
+		],
+	},
+	"wallet rename": {
+		description: "Rename an existing wallet",
+		usage: "deepdex wallet rename <current_name> <new_name>",
+		examples: ["deepdex wallet rename default main-wallet"],
+	},
+	"wallet delete": {
+		description: "Delete a wallet (requires confirmation)",
+		usage: "deepdex wallet delete <name>",
+		examples: ["deepdex wallet delete old-wallet"],
 	},
 	"wallet export": {
 		description: "Export private key (requires confirmation)",
-		usage: "deepdex wallet export",
-		examples: ["deepdex wallet export"],
+		usage: "deepdex wallet export [name]",
+		examples: ["deepdex wallet export", "deepdex wallet export trading"],
 	},
 	"wallet import": {
 		description: "Import wallet from private key",
-		usage: "deepdex wallet import <private_key>",
-		examples: ["deepdex wallet import 0x..."],
+		usage: "deepdex wallet import <private_key> [name]",
+		examples: [
+			"deepdex wallet import 0x...",
+			"deepdex wallet import 0x... trading",
+		],
+	},
+	"wallet transfer": {
+		description: "Transfer tokens to another wallet or address",
+		usage: "deepdex wallet transfer <amount> <token> [recipient]",
+		examples: [
+			"deepdex wallet transfer 10 USDC trading",
+			"deepdex wallet transfer 0.5 tDGAS 0x1234...",
+			"deepdex wallet transfer 1 ETH --to 0x5678...",
+		],
+		options: [
+			{ flag: "--to", description: "Recipient address or wallet name" },
+		],
 	},
 	account: {
 		description: "Subaccount management commands",

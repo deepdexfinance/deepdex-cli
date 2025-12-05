@@ -184,7 +184,7 @@ Account: ${accountName}`,
 
 		console.log();
 		consola.success(`${side.toUpperCase()} position opened!`);
-		const explorerUrl = `${network.explorer}/ tx/ ${hash}`;
+		const explorerUrl = `${network.explorer}/tx/${hash}`;
 		console.log(dim(`  Transaction: ${explorerUrl}`));
 		console.log(
 			dim("  Status:      ") + (orderType === "market" ? "Filled" : "Open"),

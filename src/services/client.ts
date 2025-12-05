@@ -1055,3 +1055,81 @@ export async function repayToSubaccount(
 
 	return hash;
 }
+
+// ============================================================================
+// Transfer Operations
+// ============================================================================
+
+/**
+ * Transfer native token (tDGAS) to another address
+ * @param to - Recipient address
+ * @param amount - Amount to transfer in wei
+ */
+export async function transferNative(
+	to: Address,
+	amount: bigint,
+): Promise<Hex> {
+	const client = getWalletClient();
+	const account = getAccount();
+
+	const hash = await client.sendTransaction({
+		account,
+		to,
+		value: amount,
+		chain: deepdexTestnet,
+	});
+
+	return hash;
+}
+
+/**
+ * Transfer ERC20 token to another address
+ * @param token - Token contract address
+ * @param to - Recipient address
+ * @param amount - Amount to transfer (in token's smallest unit)
+ */
+export async function transferToken(
+	token: Address,
+	to: Address,
+	amount: bigint,
+): Promise<Hex> {
+	const client = getWalletClient();
+	const account = getAccount();
+
+	const hash = await client.writeContract({
+		address: token,
+		abi: [
+			{
+				inputs: [
+					{ name: "to", type: "address" },
+					{ name: "amount", type: "uint256" },
+				],
+				name: "transfer",
+				outputs: [{ name: "", type: "bool" }],
+				stateMutability: "nonpayable",
+				type: "function",
+			},
+		],
+		functionName: "transfer",
+		args: [to, amount],
+		account,
+		chain: deepdexTestnet,
+	});
+
+	return hash;
+}
+
+/**
+ * Wait for transaction receipt
+ */
+export async function waitForTransaction(hash: Hex): Promise<{
+	status: "success" | "reverted";
+	blockNumber: bigint;
+}> {
+	const client = getPublicClient();
+	const receipt = await client.waitForTransactionReceipt({ hash });
+	return {
+		status: receipt.status,
+		blockNumber: receipt.blockNumber,
+	};
+}

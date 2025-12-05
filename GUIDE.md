@@ -12,9 +12,16 @@ deepdex
 ├── help
 │
 ├── wallet
+│   ├── list
 │   ├── info
+│   ├── create
+│   ├── switch
+│   ├── rename
+│   ├── delete
 │   ├── export
-│   └── import
+│   ├── import
+│   ├── sign
+│   └── transfer            # Transfer tokens between wallets
 │
 ├── account
 │   ├── create
@@ -122,17 +129,99 @@ Displays a list of available commands and usage instructions.
 
 ### Wallet Management
 
-#### `deepdex wallet info`
+DeepDex supports multiple wallets for different purposes (trading, bots, cold storage).
+
+#### `deepdex wallet list`
+List all wallets with their addresses.
+```bash
+deepdex wallet list
+deepdex wallet list --json
+```
+
+**Output:**
+```
+→ default (active)
+    0x1234...5678
+
+  trading
+    0xabcd...ef01
+
+  bot-wallet
+    0x9876...5432
+```
+
+#### `deepdex wallet info [name]`
 Display wallet address, balances, and nonce.
+```bash
+deepdex wallet info              # Active wallet
+deepdex wallet info trading      # Specific wallet
+```
 
-#### `deepdex wallet export`
+#### `deepdex wallet create [name]`
+Create a new wallet with optional name.
+```bash
+deepdex wallet create            # Auto-generates name (wallet-2, wallet-3, etc.)
+deepdex wallet create trading    # Create wallet named "trading"
+deepdex wallet create bot-wallet
+```
+
+#### `deepdex wallet switch <name>`
+Switch the active wallet.
+```bash
+deepdex wallet switch trading
+deepdex wallet switch default
+```
+
+#### `deepdex wallet rename <current_name> <new_name>`
+Rename an existing wallet.
+```bash
+deepdex wallet rename default main-wallet
+```
+
+#### `deepdex wallet delete <name>`
+Delete a wallet (requires confirmation).
+```bash
+deepdex wallet delete old-wallet
+```
+
+#### `deepdex wallet export [name]`
 Export private key (requires confirmation).
+```bash
+deepdex wallet export            # Export active wallet
+deepdex wallet export trading    # Export specific wallet
+```
 
-#### `deepdex wallet import <key|mnemonic>`
-Import wallet from private key or mnemonic phrase.
+#### `deepdex wallet import <private_key> [name]`
+Import wallet from private key.
+```bash
+deepdex wallet import 0x...                # Import as auto-named wallet
+deepdex wallet import 0x... trading        # Import as "trading"
+```
 
 #### `deepdex wallet sign <message>`
 Sign an arbitrary message with your wallet.
+
+#### `deepdex wallet transfer <amount> <token> [recipient]`
+Transfer tokens to another wallet or address.
+```bash
+deepdex wallet transfer 10 USDC trading          # Transfer to wallet named "trading"
+deepdex wallet transfer 0.5 tDGAS 0x1234...      # Transfer to address
+deepdex wallet transfer 1 ETH --to 0x5678...     # Using --to flag
+```
+
+**Options:**
+- `--to <address|wallet_name>` - Recipient address or wallet name
+
+**Supported Tokens:**
+- `tDGAS` - Native gas token
+- `USDC` - USD Coin
+- `ETH` - Ethereum
+
+**Notes:**
+- If recipient is omitted, prompts interactively with available wallets
+- Accepts both wallet names and addresses as recipients
+- Checks balance before transfer
+- Waits for transaction confirmation
 
 ---
 
@@ -556,7 +645,60 @@ Default location: `~/.deepdex/config.json`
 
 ## 🏗️ Core Architecture
 
-### Multi-Account Strategy
+### Multi-Wallet Management
+
+DeepDex supports multiple local wallets, each with its own private key:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Local Wallet Store                        │
+│                   (~/.deepdex/wallets.json)                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+        ▼                     ▼                     ▼
+  ┌───────────┐         ┌───────────┐         ┌───────────┐
+  │  default  │         │  trading  │         │ bot-wallet│
+  │  (active) │         │           │         │           │
+  │ 0x1234... │         │ 0xabcd... │         │ 0x9876... │
+  └───────────┘         └───────────┘         └───────────┘
+    Cold Storage          Hot Wallet           Automation
+```
+
+**Key Features:**
+- Each wallet has a unique name and encrypted private key
+- One wallet is "active" at a time (used by default)
+- Switch between wallets with `deepdex wallet switch`
+- Transfer tokens between wallets with `deepdex wallet transfer`
+
+**Common Workflows:**
+
+```bash
+# Create wallets for different purposes
+deepdex wallet create trading      # For manual trading
+deepdex wallet create bot-wallet   # For automated bots
+
+# Fund wallets from main
+deepdex wallet switch default
+deepdex wallet transfer 100 USDC trading
+deepdex wallet transfer 50 USDC bot-wallet
+
+# Switch to trading wallet
+deepdex wallet switch trading
+
+# List all wallets
+deepdex wallet list
+```
+
+**Storage:**
+- Wallets stored in `~/.deepdex/wallets.json`
+- Private keys encrypted with AES-256-GCM
+- Password required to unlock wallet for signing
+
+---
+
+### Multi-Subaccount Strategy
 
 DeepDex supports multiple isolated subaccounts for different trading strategies:
 

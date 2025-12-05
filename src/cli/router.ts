@@ -160,8 +160,24 @@ export async function route(args: ParsedArgs): Promise<void> {
 async function routeWallet(subcommand: string | undefined, args: ParsedArgs) {
 	switch (subcommand) {
 		case "info":
-		case undefined:
 			await wallet.info(args);
+			break;
+		case "list":
+		case undefined:
+			await wallet.list(args);
+			break;
+		case "create":
+			await wallet.create(args);
+			break;
+		case "switch":
+			await wallet.switchCmd(args);
+			break;
+		case "rename":
+			await wallet.rename(args);
+			break;
+		case "delete":
+		case "remove":
+			await wallet.remove(args);
 			break;
 		case "export":
 			await wallet.exportKey(args);
@@ -171,6 +187,10 @@ async function routeWallet(subcommand: string | undefined, args: ParsedArgs) {
 			break;
 		case "sign":
 			await wallet.sign(args);
+			break;
+		case "transfer":
+		case "send":
+			await wallet.transfer(args);
 			break;
 		default:
 			throw new Error(`Unknown wallet command: ${subcommand}`);
