@@ -1,4 +1,4 @@
-# DeepDex
+# DeepDex CLI
 
 A high-performance CLI trading bot and utility suite for the DeepDex protocol. Trade spot and perpetual markets, manage subaccounts, and run automated strategies on the DeepDex Testnet.
 
