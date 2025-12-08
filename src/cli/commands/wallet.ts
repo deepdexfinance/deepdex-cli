@@ -20,6 +20,7 @@ import {
 	getActiveWalletName,
 	getAllWallets,
 	getStoredAddress,
+	getUnlockedWalletName,
 	getWalletCount,
 	importWallet,
 	renameWallet,
@@ -185,7 +186,7 @@ export async function create(args: ParsedArgs): Promise<void> {
 
 	console.log();
 	consola.success("Wallet created successfully!");
-	console.log(`  Name:    ${name || "default"}`);
+	console.log(`  Name:    ${getUnlockedWalletName()}`);
 	console.log(`  Address: ${address}`);
 	console.log();
 
@@ -377,7 +378,7 @@ export async function importKey(args: ParsedArgs): Promise<void> {
 
 	console.log();
 	consola.success("Wallet imported successfully!");
-	console.log(`  Name:    ${name || getActiveWalletName()}`);
+	console.log(`  Name:    ${getUnlockedWalletName()}`);
 	console.log(`  Address: ${address}`);
 	console.log();
 }

@@ -1,7 +1,7 @@
 export const network = {
 	name: "DeepDex Testnet",
-	rpc: "https://rpc-testnetx.deepdex.finance",
-	explorer: "https://explorer-testnetx.deepdex.finance",
+	rpc: "https://rpc-testnet.deepdex.finance",
+	explorer: "https://explorer-testnet.deepdex.finance",
 	contracts: {
 		subaccount: "0x0000000000000000000000000000000000000451",
 		spot: "0x000000000000000000000000000000000000044d",
