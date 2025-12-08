@@ -1,0 +1,3 @@
+[test]
+# Test file discovery
+preload = ["./src/test-setup.ts"]
