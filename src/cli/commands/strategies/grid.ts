@@ -12,6 +12,7 @@ import {
 } from "../../../services/client.ts";
 import { getAccount } from "../../../services/wallet.ts";
 import type { BotConfig } from "../../../types/index.ts";
+import { PRICE_DECIMALS } from "../../../utils/constants.ts";
 import { formatToSize } from "../../../utils/format.ts";
 
 /**
@@ -149,7 +150,7 @@ export async function run(config: BotConfig): Promise<void> {
 						continue;
 
 					const priceStr = formatToSize(level.toString(), market.tickSize);
-					const _priceBN = parseUnits(priceStr, market.priceDecimal); // Check decimals? Spot usually 18 or 6?
+					const _priceBN = parseUnits(priceStr, PRICE_DECIMALS);
 					// Wait, spot limit order takes price?
 					// placeSpotBuyOrder args: quoteAmount, baseAmount. It implies price = quote / base.
 					// Actually, let's check placeSpotBuyOrder in client.ts.

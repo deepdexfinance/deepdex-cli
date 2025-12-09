@@ -71,7 +71,7 @@ export async function list(args: ParsedArgs): Promise<void> {
 			Pair: formatPair(m.value),
 			Price: `$${priceStr}`,
 			Fee: m.fee,
-			"Min Size": m.sizeOptions[0]?.toString() || "-",
+			"Min Size": m.sizeOptions?.[0]?.toString() || m.stepSize.toString(),
 		};
 	});
 
@@ -165,9 +165,8 @@ export async function info(args: ParsedArgs): Promise<void> {
 	const data: Record<string, string> = {
 		Type: market.isPerp ? "Perpetual" : "Spot",
 		"Trading Fee": market.fee,
-		"Price Decimals": market.priceDecimal.toString(),
-		"Order Decimals": market.orderDecimal.toString(),
-		"Size Options": market.sizeOptions.join(", "),
+		"Tick Size": market.tickSize.toString(),
+		"Step Size": market.stepSize.toString(),
 	};
 
 	if (market.isPerp) {

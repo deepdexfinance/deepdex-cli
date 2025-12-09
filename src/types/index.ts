@@ -135,12 +135,10 @@ export interface MarketPair {
 	fee: string;
 	pairId: string;
 	price: string;
-	isPerp: boolean;
-	disabled: boolean;
-	priceDecimal: number;
-	orderDecimal: number;
-	leverage: number;
-	sizeOptions: number[];
+	isPerp?: boolean;
+	disabled?: boolean;
+	leverage?: number;
+	sizeOptions?: number[];
 	tickSize: number;
 	stepSize: number;
 	tokens: TokenInfo[];

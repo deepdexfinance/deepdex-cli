@@ -3,11 +3,12 @@
  */
 
 import { consola } from "consola";
-import { parseUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { network } from "../../abis/config.ts";
 import { loadConfig } from "../../config/index.ts";
 import {
 	findMarket,
+	getOraclePrices,
 	getPublicClient,
 	getUserSubaccounts,
 	placePerpOrder,
@@ -18,7 +19,7 @@ import {
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
-import { MAX_LEVERAGE } from "../../utils/constants.ts";
+import { MAX_LEVERAGE, PRICE_DECIMALS } from "../../utils/constants.ts";
 import {
 	dim,
 	formatLeverage,
@@ -88,16 +89,41 @@ async function executePerpOrder(
 		throw new Error(`Leverage must be between 1 and ${MAX_LEVERAGE}`);
 	}
 
-	if (leverage > market.leverage) {
+	if (market.leverage && leverage > market.leverage) {
 		throw new Error(`Max leverage for ${pair} is ${market.leverage}x`);
 	}
 
 	const finalAmount = formatToSize(amount, market.stepSize);
-	const finalPrice = price ? formatToSize(price, market.tickSize) : undefined;
+
+	// For market orders, get oracle price as the finalPrice
+	let finalPrice: string | undefined;
+	if (price) {
+		finalPrice = formatToSize(price, market.tickSize);
+	} else {
+		// Market order: fetch oracle price
+		const oraclePrices = await getOraclePrices();
+		const baseSymbol = market.tokens[0]?.symbol || "";
+		const oraclePrice = oraclePrices.find(
+			(p) => p.symbol.toUpperCase() === baseSymbol.toUpperCase(),
+		)?.price;
+
+		if (!oraclePrice) {
+			throw new Error(
+				`Could not determine oracle price for ${baseSymbol}. Cannot place market order.`,
+			);
+		}
+
+		// Format oracle price (stored with PRICE_DECIMALS = 6)
+		finalPrice = formatToSize(
+			formatUnits(oraclePrice, PRICE_DECIMALS),
+			market.tickSize,
+		);
+	}
+
 	const finalTp = tp ? formatToSize(tp, market.tickSize) : undefined;
 	const finalSl = sl ? formatToSize(sl, market.tickSize) : undefined;
 
-	const orderType = finalPrice ? "limit" : "market";
+	const orderType = price ? "limit" : "market";
 
 	console.log();
 	consola.box({
@@ -106,7 +132,7 @@ async function executePerpOrder(
 Size: ${finalAmount} ${market.tokens[0]?.symbol || ""}
 Leverage: ${formatLeverage(leverage)}
 Type: ${orderType.toUpperCase()}
-${finalPrice ? `Price: $${finalPrice}` : ""}
+${price ? `Price: $${finalPrice}` : `Oracle Price: $${finalPrice}`}
 ${finalTp ? `Take Profit: $${finalTp}` : ""}
 ${finalSl ? `Stop Loss: $${finalSl}` : ""}
 ${reduceOnly ? "Reduce-Only: Yes" : ""}
@@ -160,18 +186,19 @@ Account: ${accountName}`,
 
 		let priceBigInt = 0n;
 		if (finalPrice) {
-			priceBigInt = parseUnits(finalPrice, market.priceDecimal);
+			// All prices use PRICE_DECIMALS (6)
+			priceBigInt = parseUnits(finalPrice, PRICE_DECIMALS);
 		}
 
-		const tpBigInt = finalTp ? parseUnits(finalTp, market.priceDecimal) : 0n;
-		const slBigInt = finalSl ? parseUnits(finalSl, market.priceDecimal) : 0n;
+		const tpBigInt = finalTp ? parseUnits(finalTp, PRICE_DECIMALS) : 0n;
+		const slBigInt = finalSl ? parseUnits(finalSl, PRICE_DECIMALS) : 0n;
 		const hash = await placePerpOrder({
 			subaccount: subaccount.address,
 			marketId,
 			isLong,
 			size: sizeBigInt,
 			price: priceBigInt,
-			orderType: finalPrice ? 1 : 0,
+			orderType: price ? 1 : 0,
 			leverage,
 			takeProfit: tpBigInt,
 			stopLoss: slBigInt,

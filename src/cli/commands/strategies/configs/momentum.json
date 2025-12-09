@@ -1,11 +1,11 @@
 {
-	"strategy": "momentum",
-	"account": "main",
-	"config": {
-		"pair": "ETH-USDC",
-		"interval": "1m",
-		"period": 20,
-		"leverage": 2,
-		"amount": "0.01"
-	}
+    "strategy": "momentum",
+    "account": "main",
+    "config": {
+        "pair": "ETH-USDC",
+        "interval": "10s",
+        "period": 20,
+        "leverage": 2,
+        "amount": "0.01"
+    }
 }

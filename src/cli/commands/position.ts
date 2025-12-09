@@ -322,8 +322,8 @@ ${sl ? `Stop Loss: $${sl}` : ""}`,
 
 		const marketId = Number.parseInt(market.pairId, 10);
 
-		const tpBigInt = tp ? parseUnits(tp, market.priceDecimal) : 0n;
-		const slBigInt = sl ? parseUnits(sl, market.priceDecimal) : 0n;
+		const tpBigInt = tp ? parseUnits(tp, PRICE_DECIMALS) : 0n;
+		const slBigInt = sl ? parseUnits(sl, PRICE_DECIMALS) : 0n;
 
 		const hash = await modifyTpSl(
 			subaccount.address,
