@@ -1,0 +1,11 @@
+{
+	"strategy": "grid",
+	"account": "main",
+	"config": {
+		"pair": "ETH/USDC",
+		"lowerPrice": "1000",
+		"upperPrice": "2000",
+		"grids": 10,
+		"amountPerGrid": "0.001"
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"strategy": "simple",
+	"account": "main",
+	"config": {
+		"pair": "ETH/USDC",
+		"amount": "0.001",
+		"interval": "1h",
+		"amountType": "base"
+	}
+}

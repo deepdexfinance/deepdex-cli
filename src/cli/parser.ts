@@ -158,6 +158,7 @@ function parseValue(value: string): string | number | boolean {
  */
 const SHORT_FLAGS: Record<string, string> = {
 	a: "account",
+	c: "config",
 	y: "yes",
 	v: "verbose",
 	h: "help",

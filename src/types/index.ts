@@ -297,6 +297,30 @@ export interface BotStatus {
 }
 
 // ============================================================================
+// Process Manager Types
+// ============================================================================
+
+export interface ProcessState {
+	name: string; // Unique process name
+	pid: number; // OS process ID
+	strategy: BotStrategy;
+	account: string;
+	config: Record<string, unknown>;
+	startedAt: number;
+	logFile: string;
+}
+
+export interface ProcessStore {
+	version: number;
+	processes: ProcessState[];
+}
+
+export interface ProcessStatus extends ProcessState {
+	running: boolean;
+	uptime?: number;
+}
+
+// ============================================================================
 // Health Check Types
 // ============================================================================
 

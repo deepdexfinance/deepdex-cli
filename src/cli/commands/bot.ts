@@ -13,7 +13,7 @@ import {
 import type { BotStatus, BotStrategy } from "../../types/index.ts";
 import { BOT_LOG_PATH, BOT_PID_PATH } from "../../utils/constants.ts";
 import { bold, dim, formatDuration } from "../../utils/format.ts";
-import { confirm, promptPassword, table } from "../../utils/ui.ts";
+import { confirm, promptPassword, promptPath, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, optionalArg } from "../parser.ts";
 
@@ -25,31 +25,37 @@ const STRATEGIES: {
 	name: BotStrategy;
 	description: string;
 	riskLevel: string;
+	marketType: "Spot" | "Perp" | "Both";
 }[] = [
 	{
 		name: "grid",
 		description: "Grid trading - places orders at regular price intervals",
 		riskLevel: "Medium",
+		marketType: "Spot",
 	},
 	{
 		name: "mm",
 		description: "Market making - provides liquidity on both sides",
 		riskLevel: "High",
+		marketType: "Spot",
 	},
 	{
 		name: "arbitrage",
 		description: "Arbitrage - exploits price differences across markets",
 		riskLevel: "Low",
+		marketType: "Both",
 	},
 	{
 		name: "simple",
 		description: "Simple DCA - dollar cost averaging at intervals",
 		riskLevel: "Low",
+		marketType: "Spot",
 	},
 	{
 		name: "momentum",
 		description: "Momentum - trend following using moving averages",
 		riskLevel: "High",
+		marketType: "Perp",
 	},
 ];
 
@@ -74,9 +80,21 @@ export async function start(args: ParsedArgs): Promise<void> {
 	}
 
 	const strategyName = optionalArg(args.positional, 0, "simple") as BotStrategy;
-	const configPath = getFlag<string>(args.raw, "config");
-	const accountName = getFlag<string>(args.raw, "account") || "default";
+	let configPath = getFlag<string>(args.raw, "config");
+	const accountFlag = getFlag<string>(args.raw, "account");
 	const daemon = getFlag<boolean>(args.raw, "daemon") || false;
+
+	// If --config flag is present but empty (value is true), prompt for path with autocomplete
+	const hasConfigFlag = "config" in args.raw;
+	if (
+		hasConfigFlag &&
+		(configPath === undefined || configPath === (true as unknown))
+	) {
+		configPath = await promptPath("Config file path: ", {
+			extensions: [".json"],
+			defaultValue: `./src/cli/commands/strategies/configs/${strategyName}.json`,
+		});
+	}
 
 	// Validate strategy
 	const strategy = STRATEGIES.find((s) => s.name === strategyName);
@@ -93,7 +111,7 @@ export async function start(args: ParsedArgs): Promise<void> {
 	}
 
 	// Load config if specified
-	let botConfig = {};
+	let botConfig: Record<string, unknown> = {};
 	if (configPath) {
 		if (!existsSync(configPath)) {
 			throw new Error(`Config file not found: ${configPath}`);
@@ -104,6 +122,10 @@ export async function start(args: ParsedArgs): Promise<void> {
 			throw new Error(`Invalid config file: ${configPath}`);
 		}
 	}
+
+	// Resolve account: CLI flag > config file > default
+	const accountName =
+		accountFlag || (botConfig.account as string | undefined) || "default";
 
 	console.log();
 	consola.box({
@@ -156,13 +178,18 @@ Mode: ${daemon ? "Background (daemon)" : "Foreground"}`,
 		console.log(dim("  Press Ctrl+C to stop the bot."));
 		console.log();
 
-		if (["simple", "grid", "momentum", "arbitrage"].includes(strategyName)) {
+		if (
+			["simple", "grid", "momentum", "arbitrage", "mm"].includes(strategyName)
+		) {
 			// Dynamic import to avoid circular dependencies if any
 			const { run } = await import(`./strategies/${strategyName}.ts`);
+			// Extract inner config if the JSON file has nested structure
+			const innerConfig =
+				(botConfig as Record<string, unknown>).config || botConfig;
 			await run({
 				strategy: strategyName,
 				account: accountName,
-				config: botConfig,
+				config: innerConfig,
 			});
 		} else {
 			// In production, this would start the actual bot loop
@@ -327,6 +354,7 @@ export async function listStrategies(args: ParsedArgs): Promise<void> {
 	const tableData = STRATEGIES.map((s) => ({
 		Name: bold(s.name),
 		Description: s.description,
+		Market: s.marketType,
 		Risk: s.riskLevel,
 	}));
 
@@ -335,6 +363,7 @@ export async function listStrategies(args: ParsedArgs): Promise<void> {
 			[
 				{ header: "Name", key: "Name" },
 				{ header: "Description", key: "Description" },
+				{ header: "Market", key: "Market" },
 				{ header: "Risk", key: "Risk" },
 			],
 			tableData,

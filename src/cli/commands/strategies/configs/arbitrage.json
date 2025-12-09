@@ -1,0 +1,10 @@
+{
+	"strategy": "arbitrage",
+	"account": "main",
+	"config": {
+		"pair": "ETH/USDC",
+		"minSpread": "0.005",
+		"amount": "0.01",
+		"checkInterval": 5000
+	}
+}

@@ -1,0 +1,14 @@
+{
+	"strategy": "mm",
+	"account": "main",
+	"config": {
+		"pair": "ETH/USDC",
+		"spread": "0.002",
+		"orderSize": "0.01",
+		"levels": 8,
+		"levelSpacing": "0.001",
+		"refreshInterval": 5000,
+		"inventoryTarget": 0.5,
+		"maxSkew": 0.03
+	}
+}

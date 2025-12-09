@@ -263,6 +263,111 @@ export async function select(
 	throw new Error("Invalid selection");
 }
 
+/**
+ * Ask for file path input with tab-completion
+ */
+export async function promptPath(
+	message: string,
+	options?: {
+		defaultValue?: string;
+		extensions?: string[];
+		baseDir?: string;
+	},
+): Promise<string> {
+	const { readdirSync, statSync } = await import("node:fs");
+	const { resolve, dirname, basename, join } = await import("node:path");
+
+	const baseDir = options?.baseDir || process.cwd();
+	const extensions = options?.extensions || [".json"];
+
+	// Completer function for tab completion
+	const completer = (line: string): [string[], string] => {
+		try {
+			// Resolve the path relative to baseDir
+			const inputPath = line || "./";
+			const fullPath = resolve(baseDir, inputPath);
+
+			let searchDir: string;
+			let partial: string;
+
+			try {
+				const stat = statSync(fullPath);
+				if (stat.isDirectory()) {
+					searchDir = fullPath;
+					partial = "";
+				} else {
+					searchDir = dirname(fullPath);
+					partial = basename(fullPath);
+				}
+			} catch {
+				searchDir = dirname(fullPath);
+				partial = basename(fullPath);
+			}
+
+			// Read directory contents
+			let entries: string[] = [];
+			try {
+				entries = readdirSync(searchDir);
+			} catch {
+				return [[], line];
+			}
+
+			// Filter entries
+			const matches = entries
+				.filter((entry) => {
+					if (!entry.startsWith(partial)) return false;
+
+					const entryPath = join(searchDir, entry);
+					try {
+						const entryStat = statSync(entryPath);
+						if (entryStat.isDirectory()) return true;
+						// Filter by extension
+						return extensions.some((ext) => entry.endsWith(ext));
+					} catch {
+						return false;
+					}
+				})
+				.map((entry) => {
+					const entryPath = join(searchDir, entry);
+					try {
+						const entryStat = statSync(entryPath);
+						// Build the completion string
+						const dirPart = inputPath.includes("/")
+							? inputPath.substring(0, inputPath.lastIndexOf("/") + 1)
+							: inputPath.startsWith(".")
+								? ""
+								: "./";
+						const suffix = entryStat.isDirectory() ? "/" : "";
+						return dirPart + entry + suffix;
+					} catch {
+						return entry;
+					}
+				});
+
+			return [matches, line];
+		} catch {
+			return [[], line];
+		}
+	};
+
+	const rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+		completer,
+	});
+
+	// Show hint
+	console.log(dim("  (Use Tab for path completion)"));
+
+	return new Promise((resolve) => {
+		rl.question(message, (answer) => {
+			rl.close();
+			const result = answer.trim() || options?.defaultValue || "";
+			resolve(result);
+		});
+	});
+}
+
 // ============================================================================
 // Progress & Spinners (using consola)
 // ============================================================================

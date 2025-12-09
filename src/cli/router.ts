@@ -15,6 +15,7 @@ import * as init from "./commands/init.ts";
 import * as market from "./commands/market.ts";
 import * as order from "./commands/order.ts";
 import * as perp from "./commands/perp.ts";
+import * as pm from "./commands/pm.ts";
 import * as position from "./commands/position.ts";
 import * as spot from "./commands/spot.ts";
 import * as wallet from "./commands/wallet.ts";
@@ -129,6 +130,11 @@ export async function route(args: ParsedArgs): Promise<void> {
 		// Bot
 		case "bot":
 			await routeBot(secondary, args);
+			break;
+
+		// Process Manager
+		case "pm":
+			await routePm(secondary, args);
 			break;
 
 		// Config
@@ -339,6 +345,36 @@ async function routeBot(subcommand: string | undefined, args: ParsedArgs) {
 			break;
 		default:
 			throw new Error(`Unknown bot command: ${subcommand}`);
+	}
+}
+
+async function routePm(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "ps":
+		case "list":
+		case undefined:
+			await pm.ps(args);
+			break;
+		case "start":
+			await pm.start(args);
+			break;
+		case "stop":
+			await pm.stop(args);
+			break;
+		case "restart":
+			await pm.restart(args);
+			break;
+		case "logs":
+			await pm.logs(args);
+			break;
+		case "kill":
+			await pm.kill(args);
+			break;
+		case "stop-all":
+			await pm.stopAll(args);
+			break;
+		default:
+			throw new Error(`Unknown pm command: ${subcommand}`);
 	}
 }
 

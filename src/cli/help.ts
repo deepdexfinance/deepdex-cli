@@ -427,6 +427,74 @@ const COMMANDS: Record<string, CommandHelp> = {
 			{ flag: "--quiet", description: "Exit code only" },
 		],
 	},
+	pm: {
+		description: "Process manager for running multiple bots",
+		usage: "deepdex pm <command>",
+		subcommands: [
+			{ name: "ps", description: "List all running processes" },
+			{ name: "start", description: "Start a named process" },
+			{ name: "stop", description: "Stop a process by name" },
+			{ name: "restart", description: "Restart a process" },
+			{ name: "logs", description: "View logs for a process" },
+			{ name: "kill", description: "Force kill a process" },
+			{ name: "stop-all", description: "Stop all running processes" },
+		],
+	},
+	"pm ps": {
+		description: "List all running processes with status",
+		usage: "deepdex pm ps",
+		examples: ["deepdex pm ps", "deepdex pm ps --json"],
+	},
+	"pm start": {
+		description: "Start a new named bot process in the background",
+		usage: "deepdex pm start <name> <strategy> [options]",
+		examples: [
+			"deepdex pm start eth-grid grid --config ./grid.json",
+			"deepdex pm start btc-dca simple --config ./dca.json --account trading",
+		],
+		options: [
+			{ flag: "--config", description: "Path to strategy config file" },
+			{ flag: "--account, -a", description: "Subaccount to use" },
+		],
+	},
+	"pm stop": {
+		description: "Gracefully stop a process by name",
+		usage: "deepdex pm stop <name>",
+		examples: ["deepdex pm stop eth-grid", "deepdex pm stop eth-grid --yes"],
+		options: [{ flag: "--yes, -y", description: "Skip confirmation" }],
+	},
+	"pm restart": {
+		description: "Restart a process with the same configuration",
+		usage: "deepdex pm restart <name>",
+		examples: ["deepdex pm restart eth-grid"],
+	},
+	"pm logs": {
+		description: "View logs for a specific process",
+		usage: "deepdex pm logs <name> [options]",
+		examples: [
+			"deepdex pm logs eth-grid",
+			"deepdex pm logs eth-grid --follow",
+			"deepdex pm logs eth-grid -n 100",
+		],
+		options: [
+			{ flag: "--follow, -f", description: "Follow log output (like tail -f)" },
+			{
+				flag: "--lines, -n",
+				description: "Number of lines to show (default: 50)",
+			},
+		],
+	},
+	"pm kill": {
+		description: "Force kill a process (SIGKILL)",
+		usage: "deepdex pm kill <name>",
+		examples: ["deepdex pm kill eth-grid"],
+	},
+	"pm stop-all": {
+		description: "Stop all running processes",
+		usage: "deepdex pm stop-all",
+		examples: ["deepdex pm stop-all", "deepdex pm stop-all --yes"],
+		options: [{ flag: "--yes, -y", description: "Skip confirmation" }],
+	},
 };
 
 // ============================================================================
@@ -468,7 +536,8 @@ ${bold("TRADING")}
   position          Position management
 
 ${bold("AUTOMATION")}
-  bot               Trading bot management
+  bot               Trading bot (foreground)
+  pm                Process manager (background)
 
 ${bold("UTILITY")}
   config            Configuration management

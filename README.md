@@ -49,8 +49,13 @@ deepdex account deposit 1000 USDC
 deepdex spot buy ETH/USDC 0.5
 deepdex perp long ETH-USDC 1 --lev 10
 
-# Run automated bot
+# Run automated bot (foreground)
 deepdex bot start grid
+
+# Or use process manager for multiple bots (background)
+deepdex pm start eth-grid grid --config ./configs/grid.json
+deepdex pm start btc-dca simple --config ./configs/dca.json
+deepdex pm ps  # List all running processes
 ```
 
 ## 🚀 Features
@@ -73,6 +78,11 @@ deepdex bot start grid
   - Grid, Market Making, and Arbitrage strategies
   - Real-time Oracle price feeds
   - Backtesting support
+
+- **Process Manager** (`pm`)
+  - Run multiple bots simultaneously with unique names
+  - PM2/Docker Compose style management
+  - Per-process logs and monitoring
 
 ### 🤖 Strategies
 

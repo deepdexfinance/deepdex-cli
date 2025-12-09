@@ -72,6 +72,15 @@ deepdex
 │   ├── list-strategies
 │   └── backtest <strategy>
 │
+├── pm                      # Process Manager (multi-bot)
+│   ├── ps                  # List all processes
+│   ├── start <name> <strategy> [--config]
+│   ├── stop <name>
+│   ├── restart <name>
+│   ├── logs <name>
+│   ├── kill <name>
+│   └── stop-all
+│
 ├── config
 │   ├── show
 │   ├── set <key> <value>
@@ -745,9 +754,123 @@ The bot supports both foreground and background execution:
 | Mode | Command | Use Case |
 |------|---------|----------|
 | Foreground | `deepdex bot start` | Development, debugging |
-| Background | `deepdex bot start --daemon` | Production, servers |
+| Background | `deepdex bot start --daemon` | Production, single bot |
+| Multi-Process | `deepdex pm start` | Production, multiple bots |
 
-**Process Lifecycle:**
+---
+
+### Process Manager (`pm`)
+
+The `pm` command provides PM2/Docker Compose style process management for running multiple bots simultaneously with unique names.
+
+#### `deepdex pm ps`
+List all registered processes with their status.
+```bash
+deepdex pm ps
+deepdex pm ps --json
+```
+
+**Output:**
+```
+╭───📋 Process Manager─────────────────────────────────────╮
+│                                                          │
+│  3 processes registered                                  │
+│                                                          │
+╰──────────────────────────────────────────────────────────╯
+
+┌──────────┬──────────┬───────┬─────────┬────────────┬──────────┐
+│ Name     │ Strategy │ PID   │ Account │ Status     │ Uptime   │
+├──────────┼──────────┼───────┼─────────┼────────────┼──────────┤
+│ eth-grid │ grid     │ 12345 │ default │ 🟢 running │ 2h 15m   │
+│ btc-dca  │ simple   │ 12346 │ trading │ 🟢 running │ 45m      │
+│ arb-bot  │ arbitrage│ 12347 │ default │ 🔴 stopped │ -        │
+└──────────┴──────────┴───────┴─────────┴────────────┴──────────┘
+```
+
+#### `deepdex pm start <name> <strategy> [options]`
+Start a new named process in the background.
+```bash
+deepdex pm start eth-grid grid --config ./configs/grid.json
+deepdex pm start btc-dca simple --config ./configs/dca.json --account trading
+```
+
+**Options:**
+- `--config <path>` - Path to strategy config file
+- `--account, -a <name>` - Subaccount to use
+
+**Process Name Rules:**
+- Must be unique across all processes
+- Alphanumeric characters, dashes, and underscores only
+- Maximum 32 characters
+
+#### `deepdex pm stop <name>`
+Gracefully stop a process (sends SIGTERM).
+```bash
+deepdex pm stop eth-grid
+deepdex pm stop eth-grid --yes  # Skip confirmation
+```
+
+#### `deepdex pm restart <name>`
+Restart a process with the same configuration.
+```bash
+deepdex pm restart eth-grid
+```
+
+#### `deepdex pm logs <name> [options]`
+View logs for a specific process.
+```bash
+deepdex pm logs eth-grid
+deepdex pm logs eth-grid --follow  # Stream logs (like tail -f)
+deepdex pm logs eth-grid -n 100    # Show last 100 lines
+```
+
+**Options:**
+- `--follow, -f` - Stream logs continuously
+- `--lines, -n <number>` - Number of lines to show (default: 50)
+
+#### `deepdex pm kill <name>`
+Force kill a process (sends SIGKILL).
+```bash
+deepdex pm kill eth-grid
+```
+
+#### `deepdex pm stop-all`
+Stop all running processes.
+```bash
+deepdex pm stop-all
+deepdex pm stop-all --yes  # Skip confirmation
+```
+
+**PM Files:**
+- Process Store: `~/.deepdex/processes.json`
+- Process Logs: `~/.deepdex/logs/processes/<name>.log`
+
+---
+
+**Example Multi-Bot Workflow:**
+```bash
+# Start multiple bots with different strategies
+deepdex pm start eth-grid grid --config ./configs/eth-grid.json
+deepdex pm start sol-momentum momentum --config ./configs/sol-momentum.json  
+deepdex pm start arb-bot arbitrage --config ./configs/arb.json --account arb
+
+# Check all running processes
+deepdex pm ps
+
+# View logs for a specific bot
+deepdex pm logs eth-grid --follow
+
+# Restart a bot after config change
+deepdex pm restart eth-grid
+
+# Stop individual bot
+deepdex pm stop sol-momentum
+
+# Stop everything
+deepdex pm stop-all
+```
+
+**Single Bot Lifecycle (using `bot` command):**
 ```bash
 # Start in foreground (Ctrl+C to stop)
 deepdex bot start grid
@@ -769,8 +892,8 @@ deepdex bot stop
 deepdex bot logs --follow
 ```
 
-**PID File:** `~/.deepdex/bot.pid`
-**Log File:** `~/.deepdex/logs/bot.log`
+**Bot PID File:** `~/.deepdex/bot.pid`
+**Bot Log File:** `~/.deepdex/logs/bot.log`
 
 ---
 
