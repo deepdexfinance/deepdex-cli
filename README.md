@@ -152,14 +152,6 @@ git clone https://github.com/deepdex/deepdex.git
 cd deepdex
 bun install
 ```
-
-### Configuration
-
-```bash
-cp .env.example .env
-# Edit .env with your private key
-```
-
 ### Run
 
 ```bash
