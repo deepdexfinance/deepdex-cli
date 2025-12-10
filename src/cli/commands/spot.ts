@@ -10,6 +10,7 @@ import { loadConfig } from "../../config/index.ts";
 import {
 	findMarket,
 	getOraclePrices,
+	getSubaccountBalance,
 	getUserSubaccounts,
 	placeSpotBuyOrder,
 	placeSpotMarketBuy,
@@ -22,6 +23,7 @@ import {
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
+import { PRICE_DECIMALS } from "../../utils/constants.ts";
 import { dim, formatSide, formatToSize } from "../../utils/format.ts";
 import { confirm, promptPassword } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
@@ -52,7 +54,7 @@ async function executeSpotOrder(
 	await ensureUnlocked();
 
 	const pair = requireArg(args.positional, 0, "pair");
-	const amount = requireArg(args.positional, 1, "amount");
+	const amountStr = requireArg(args.positional, 1, "amount");
 	const price = getFlag<string>(args.raw, "price");
 	const postOnly = getFlag<boolean>(args.raw, "post-only") || false;
 	const reduceOnly = getFlag<boolean>(args.raw, "reduce-only") || false;
@@ -72,7 +74,103 @@ async function executeSpotOrder(
 		);
 	}
 
-	const finalAmount = formatToSize(amount, market.stepSize);
+	const baseToken = market.tokens[0];
+	const quoteToken = market.tokens[1];
+
+	if (!baseToken || !quoteToken) {
+		throw new Error("Invalid market configuration: missing tokens");
+	}
+
+	// Get subaccount early for percentage calculation
+	const account = getAccount();
+	const subaccounts = await getUserSubaccounts(account.address);
+	const subaccount = subaccounts.find((s) => s.name === accountName);
+
+	if (!subaccount) {
+		throw new Error(
+			`Subaccount '${accountName}' not found. Create it first with 'deepdex account create ${accountName}'`,
+		);
+	}
+
+	// Handle percentage-based amount
+	let finalAmount: string;
+	let isPercentage = false;
+
+	if (amountStr.endsWith("%")) {
+		isPercentage = true;
+		const percentage = Number.parseFloat(amountStr.slice(0, -1));
+		if (Number.isNaN(percentage) || percentage <= 0 || percentage > 100) {
+			throw new Error("Invalid percentage. Must be between 0 and 100.");
+		}
+
+		if (side === "sell") {
+			// For sell: percentage of base token balance
+			const baseBalance = await getSubaccountBalance(
+				subaccount.address,
+				baseToken.symbol,
+			);
+			if (baseBalance === 0n) {
+				throw new Error(`No ${baseToken.symbol} balance in subaccount.`);
+			}
+
+			const amount =
+				(baseBalance * BigInt(Math.round(percentage * 100))) / 10000n;
+			finalAmount = formatToSize(
+				formatUnits(amount, baseToken.decimals),
+				market.stepSize,
+			);
+
+			console.log(
+				dim(
+					`  ${amountStr} of ${baseToken.symbol} balance = ${finalAmount} ${baseToken.symbol}`,
+				),
+			);
+		} else {
+			// For buy: percentage of quote token balance, converted to base amount
+			const quoteBalance = await getSubaccountBalance(
+				subaccount.address,
+				quoteToken.symbol,
+			);
+			if (quoteBalance === 0n) {
+				throw new Error(`No ${quoteToken.symbol} balance in subaccount.`);
+			}
+
+			// Get oracle price to convert quote to base amount
+			const prices = await getOraclePrices();
+			const oraclePrice = prices.find(
+				(p) => p.symbol.toUpperCase() === baseToken.symbol.toUpperCase(),
+			)?.price;
+
+			if (!oraclePrice) {
+				throw new Error(
+					`Could not determine price for ${baseToken.symbol}.`,
+				);
+			}
+
+			const quoteToUse =
+				(quoteBalance * BigInt(Math.round(percentage * 100))) / 10000n;
+			// Convert quote amount to base amount: quoteAmount / price
+			// quoteToUse is in quote decimals, oraclePrice is in PRICE_DECIMALS
+			const baseAmount =
+				(quoteToUse * 10n ** BigInt(baseToken.decimals) * 10n ** BigInt(PRICE_DECIMALS)) /
+				(oraclePrice * 10n ** BigInt(quoteToken.decimals));
+
+			finalAmount = formatToSize(
+				formatUnits(baseAmount, baseToken.decimals),
+				market.stepSize,
+			);
+
+			const quoteUsedStr = formatUnits(quoteToUse, quoteToken.decimals);
+			console.log(
+				dim(
+					`  ${amountStr} of ${quoteToken.symbol} ($${quoteUsedStr}) = ${finalAmount} ${baseToken.symbol}`,
+				),
+			);
+		}
+	} else {
+		finalAmount = formatToSize(amountStr, market.stepSize);
+	}
+
 	const finalPrice = price ? formatToSize(price, market.tickSize) : undefined;
 
 	const orderType = finalPrice ? "limit" : "market";
@@ -117,23 +215,6 @@ Account: ${accountName}`,
 	let txHash: Hex;
 
 	try {
-		const account = getAccount();
-		const subaccounts = await getUserSubaccounts(account.address);
-		const subaccount = subaccounts.find((s) => s.name === accountName);
-
-		if (!subaccount) {
-			throw new Error(
-				`Subaccount '${accountName}' not found. Create it first with 'deepdex account create ${accountName}'`,
-			);
-		}
-
-		const baseToken = market.tokens[0];
-		const quoteToken = market.tokens[1];
-
-		if (!baseToken || !quoteToken) {
-			throw new Error("Invalid market configuration: missing tokens");
-		}
-
 		const baseAmount = parseUnits(finalAmount, baseToken.decimals);
 		let quoteAmount = 0n;
 
@@ -187,8 +268,8 @@ Account: ${accountName}`,
 					side === "buy"
 						? amountBN.times(marketPrice).times(slippage.plus(1))
 						: amountBN
-								.times(marketPrice)
-								.times(new BigNumber(1).minus(slippage));
+							.times(marketPrice)
+							.times(new BigNumber(1).minus(slippage));
 
 				quoteAmount = parseUnits(
 					formatToSize(estimatedQuote, market.stepSize),

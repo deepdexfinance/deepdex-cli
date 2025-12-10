@@ -3,13 +3,15 @@
  */
 
 import { consola } from "consola";
-import { type Address, parseUnits } from "viem";
+import type { Address } from "viem";
 import { network } from "../../abis/config.ts";
 import {
 	createSubaccount,
 	depositToSubaccount,
 	getPublicClient,
 	getSubaccounts,
+	getSubaccountBalance,
+	getTokenBalance,
 	setDelegate,
 	withdrawFromSubaccount,
 } from "../../services/client.ts";
@@ -19,7 +21,12 @@ import {
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
-import { dim, info as infoMsg, truncateAddress } from "../../utils/format.ts";
+import {
+	dim,
+	info as infoMsg,
+	parseAmountOrPercent,
+	truncateAddress,
+} from "../../utils/format.ts";
 import { confirm, keyValue, promptPassword, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, optionalArg, requireArg } from "../parser.ts";
@@ -233,12 +240,34 @@ export async function deposit(args: ParsedArgs): Promise<void> {
 		throw new Error(`Subaccount "${accountName}" not found.`);
 	}
 
-	const amount = parseUnits(amountStr, tokenInfo.decimals);
+	// Parse amount (supports percentage like "50%" or "100%")
+	let walletBalance: bigint | undefined;
+	if (amountStr.endsWith("%")) {
+		walletBalance = await getTokenBalance(
+			owner as Address,
+			tokenInfo.address as Address,
+		);
+	}
+
+	const parsed = parseAmountOrPercent(
+		amountStr,
+		tokenInfo.decimals,
+		walletBalance,
+		tokenSymbol,
+	);
+
+	if (parsed.isPercentage) {
+		console.log(
+			dim(
+				`  ${amountStr} of wallet balance = ${parsed.displayAmount} ${tokenSymbol}`,
+			),
+		);
+	}
 
 	console.log();
 	consola.box({
 		title: "💰 Deposit",
-		message: `Deposit ${amountStr} ${tokenSymbol} to "${accountName}"`,
+		message: `Deposit ${parsed.displayAmount} ${tokenSymbol} to "${accountName}"`,
 		style: {
 			padding: 1,
 			borderColor: "green",
@@ -250,7 +279,7 @@ export async function deposit(args: ParsedArgs): Promise<void> {
 	if (!args.flags.yes) {
 		console.log();
 		const confirmed = await confirm(
-			`Deposit ${amountStr} ${tokenSymbol}?`,
+			`Deposit ${parsed.displayAmount} ${tokenSymbol}?`,
 			true,
 		);
 		if (!confirmed) {
@@ -264,14 +293,14 @@ export async function deposit(args: ParsedArgs): Promise<void> {
 		const hash = await depositToSubaccount(
 			subaccount.address,
 			tokenSymbol,
-			amount,
+			parsed.amount,
 		);
 		const client = getPublicClient();
 		await client.waitForTransactionReceipt({ hash });
 
 		console.log();
 		consola.success(
-			`Deposited ${amountStr} ${tokenSymbol} to "${accountName}"`,
+			`Deposited ${parsed.displayAmount} ${tokenSymbol} to "${accountName}"`,
 		);
 		const explorerUrl = `${network.explorer}/tx/${hash}`;
 		console.log(dim(`  Transaction: ${explorerUrl}`));
@@ -288,7 +317,7 @@ export async function withdraw(args: ParsedArgs): Promise<void> {
 	ensureWallet();
 	await ensureUnlocked();
 
-	const amount = requireArg(args.positional, 0, "amount");
+	const amountStr = requireArg(args.positional, 0, "amount");
 	const token = requireArg(args.positional, 1, "token").toUpperCase();
 	const accountName = getFlag<string>(args.raw, "account") || "default";
 
@@ -300,10 +329,39 @@ export async function withdraw(args: ParsedArgs): Promise<void> {
 		throw new Error(`Unknown token: ${token}`);
 	}
 
+	const owner = getStoredAddress()!;
+	const subaccounts = await getSubaccounts(owner);
+	const subaccount = subaccounts.find((s) => s.name === accountName);
+
+	if (!subaccount) {
+		throw new Error(`Subaccount "${accountName}" not found.`);
+	}
+
+	// Parse amount (supports percentage like "50%" or "100%")
+	let subaccountBalance: bigint | undefined;
+	if (amountStr.endsWith("%")) {
+		subaccountBalance = await getSubaccountBalance(subaccount.address, token);
+	}
+
+	const parsed = parseAmountOrPercent(
+		amountStr,
+		tokenInfo.decimals,
+		subaccountBalance,
+		token,
+	);
+
+	if (parsed.isPercentage) {
+		console.log(
+			dim(
+				`  ${amountStr} of subaccount balance = ${parsed.displayAmount} ${token}`,
+			),
+		);
+	}
+
 	console.log();
 	consola.box({
 		title: "💸 Withdraw",
-		message: `Withdraw ${amount} ${token} from "${accountName}"`,
+		message: `Withdraw ${parsed.displayAmount} ${token} from "${accountName}"`,
 		style: {
 			padding: 1,
 			borderColor: "yellow",
@@ -314,22 +372,15 @@ export async function withdraw(args: ParsedArgs): Promise<void> {
 	// Confirm
 	if (!args.flags.yes) {
 		console.log();
-		const confirmed = await confirm(`Withdraw ${amount} ${token}?`, true);
+		const confirmed = await confirm(
+			`Withdraw ${parsed.displayAmount} ${token}?`,
+			true,
+		);
 		if (!confirmed) {
 			consola.info("Cancelled.");
 			return;
 		}
 	}
-
-	const owner = getStoredAddress()!;
-	const subaccounts = await getSubaccounts(owner);
-	const subaccount = subaccounts.find((s) => s.name === accountName);
-
-	if (!subaccount) {
-		throw new Error(`Subaccount "${accountName}" not found.`);
-	}
-
-	const amountBigInt = parseUnits(amount, tokenInfo.decimals);
 
 	consola.start("Processing withdrawal...");
 
@@ -337,13 +388,15 @@ export async function withdraw(args: ParsedArgs): Promise<void> {
 		const hash = await withdrawFromSubaccount(
 			subaccount.address,
 			token,
-			amountBigInt,
+			parsed.amount,
 		);
 		const client = getPublicClient();
 		await client.waitForTransactionReceipt({ hash });
 
 		console.log();
-		consola.success(`Withdrew ${amount} ${token} from "${accountName}"`);
+		consola.success(
+			`Withdrew ${parsed.displayAmount} ${token} from "${accountName}"`,
+		);
 		const explorerUrl = `${network.explorer}/tx/${hash}`;
 		console.log(dim(`  Transaction: ${explorerUrl}`));
 		console.log(dim("  Funds returned to your wallet"));

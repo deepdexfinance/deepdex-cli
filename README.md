@@ -44,10 +44,13 @@ deepdex faucet
 # Create a subaccount and deposit
 deepdex account create
 deepdex account deposit 1000 USDC
+deepdex account deposit 50% ETH    # Deposit 50% of wallet balance
 
-# Start trading
+# Start trading (supports % amounts)
 deepdex spot buy ETH/USDC 0.5
+deepdex spot buy ETH/USDC 50%      # Buy with 50% of USDC balance
 deepdex perp long ETH-USDC 1 --lev 10
+deepdex perp long ETH-USDC 25% --lev 5  # Use 25% of margin at 5x
 
 # Run automated bot (foreground)
 deepdex bot start grid

@@ -3,7 +3,7 @@
  */
 
 import { consola } from "consola";
-import { parseUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { network } from "../../abis/config.ts";
 import { loadConfig } from "../../config/index.ts";
 import {
@@ -245,7 +245,26 @@ Size: ${size || "Full position"}`,
 			if (!position) throw new Error("No open position to close.");
 
 			const isLong = !position.isLong; // Opposite side
-			const sizeBigInt = parseUnits(size, market.tokens[0].decimals);
+
+			// Handle percentage-based partial close
+			let sizeBigInt: bigint;
+			if (size.endsWith("%")) {
+				const percentage = Number.parseFloat(size.slice(0, -1));
+				if (Number.isNaN(percentage) || percentage <= 0 || percentage > 100) {
+					throw new Error("Invalid percentage. Must be between 0 and 100.");
+				}
+
+				sizeBigInt =
+					(position.size * BigInt(Math.round(percentage * 100))) / 10000n;
+				const displaySize = formatUnits(sizeBigInt, market.tokens[0].decimals);
+				console.log(
+					dim(
+						`  ${size} of position = ${displaySize} ${market.tokens[0].symbol}`,
+					),
+				);
+			} else {
+				sizeBigInt = parseUnits(size, market.tokens[0].decimals);
+			}
 
 			hash = await placePerpOrder({
 				subaccount: subaccount.address,

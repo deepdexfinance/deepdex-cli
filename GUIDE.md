@@ -211,10 +211,11 @@ deepdex wallet import 0x... trading        # Import as "trading"
 Sign an arbitrary message with your wallet.
 
 #### `deepdex wallet transfer <amount> <token> [recipient]`
-Transfer tokens to another wallet or address.
+Transfer tokens to another wallet or address. Amount can be a number or a percentage of your balance.
 ```bash
-deepdex wallet transfer 10 USDC trading          # Transfer to wallet named "trading"
-deepdex wallet transfer 0.5 tDGAS 0x1234...      # Transfer to address
+deapdex wallet transfer 10 USDC trading          # Transfer to wallet named "trading"
+deepdex wallet transfer 50% USDC trading         # Transfer 50% of USDC balance
+deepdex wallet transfer 100% tDGAS 0x1234...     # Transfer all tDGAS to address
 deepdex wallet transfer 1 ETH --to 0x5678...     # Using --to flag
 ```
 
@@ -246,14 +247,20 @@ Lists all created subaccounts and their statuses.
 Display detailed information about a specific subaccount.
 
 #### `deepdex account deposit <amount> <token>`
-Deposits assets (e.g., USDC, ETH) from your main wallet into a subaccount.
+Deposits assets (e.g., USDC, ETH) from your main wallet into a subaccount. Amount can be a number or a percentage of your wallet balance.
 ```bash
 deepdex account deposit 1000 USDC
-deepdex account deposit 0.5 ETH --account trading-main
+deepdex account deposit 50% USDC                  # Deposit 50% of wallet USDC balance
+deepdex account deposit 100% ETH --account trading-main  # Deposit all ETH
 ```
 
 #### `deepdex account withdraw <amount> <token>`
-Withdraws assets from a subaccount back to your main wallet.
+Withdraws assets from a subaccount back to your main wallet. Amount can be a number or a percentage of your subaccount balance.
+```bash
+deepdex account withdraw 500 USDC
+deepdex account withdraw 50% USDC --account trading-main  # Withdraw 50% of subaccount balance
+deepdex account withdraw 100% ETH                 # Withdraw all ETH
+```
 
 #### `deepdex account delegate <subaccount> <delegate_address>`
 Delegates trading authority of a subaccount to another address (e.g., a hot wallet for bot execution).
@@ -316,9 +323,10 @@ Portfolio summary with unrealized P&L, margin usage, and risk metrics.
 ### Spot Trading
 
 #### `deepdex spot buy <pair> <amount> [options]`
-Execute a spot buy order.
+Execute a spot buy order. Amount can be a number or a percentage of your quote token (USDC) balance.
 ```bash
 deepdex spot buy ETH/USDC 1.5                    # Market order
+deepdex spot buy ETH/USDC 50%                    # Buy with 50% of USDC balance
 deepdex spot buy ETH/USDC 1.5 --price 2000       # Limit order
 deepdex spot buy ETH/USDC 1.5 --price 2000 --post-only
 ```
@@ -329,10 +337,11 @@ deepdex spot buy ETH/USDC 1.5 --price 2000 --post-only
 - `--account <name>` - Specify subaccount
 
 #### `deepdex spot sell <pair> <amount> [options]`
-Execute a spot sell order.
+Execute a spot sell order. Amount can be a number or a percentage of your base token balance.
 ```bash
 deepdex spot sell ETH/USDC 1.5 --price 2100
-deepdex spot sell ETH/USDC 1.5 --reduce-only
+deepdex spot sell ETH/USDC 50%                   # Sell 50% of ETH balance
+deepdex spot sell ETH/USDC 100% --reduce-only    # Sell all ETH
 ```
 
 **Options:**
@@ -345,9 +354,11 @@ deepdex spot sell ETH/USDC 1.5 --reduce-only
 ### Perpetual Trading
 
 #### `deepdex perp long <pair> <amount> [options]`
-Open a long perpetual position.
+Open a long perpetual position. Amount can be a number or a percentage of your available margin.
 ```bash
 deepdex perp long ETH-USDC 1.5 --lev 10
+deepdex perp long ETH-USDC 50% --lev 10          # Use 50% of available margin
+deepdex perp long ETH-USDC 100% --lev 5          # Use all available margin at 5x
 deepdex perp long ETH-USDC 1.5 --lev 10 --price 2000 --tp 2200 --sl 1900
 ```
 
@@ -363,6 +374,7 @@ deepdex perp long ETH-USDC 1.5 --lev 10 --price 2000 --tp 2200 --sl 1900
 Open a short perpetual position.
 ```bash
 deepdex perp short SOL-USDC 50 --lev 5 --tp 20 --sl 28
+deepdex perp short SOL-USDC 25% --lev 3          # Use 25% of available margin
 ```
 
 *(Same options as `perp long`)*
@@ -419,10 +431,12 @@ deepdex position list --account trading-main
 Display detailed position information including entry price, P&L, liquidation price.
 
 #### `deepdex position close <position_id> [options]`
-Close a position (fully or partially).
+Close a position (fully or partially). Size can be a number or a percentage of the position.
 ```bash
-deepdex position close 0x1234...           # Close entire position
-deepdex position close 0x1234... --size 0.5  # Close 0.5 units
+deepdex position close ETH-USDC                # Close entire position
+deepdex position close ETH-USDC --size 0.5     # Close 0.5 units
+deepdex position close ETH-USDC --size 50%     # Close 50% of position
+deepdex position close ETH-USDC --size 100%    # Close entire position
 ```
 
 #### `deepdex position modify <position_id> [options]`

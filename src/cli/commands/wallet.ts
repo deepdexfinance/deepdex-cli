@@ -3,7 +3,7 @@
  */
 
 import { consola } from "consola";
-import { type Address, isAddress, parseUnits } from "viem";
+import { type Address, isAddress } from "viem";
 import { network } from "../../abis/config.ts";
 import {
 	getBalance,
@@ -30,7 +30,12 @@ import {
 	walletExists,
 	walletNameExists,
 } from "../../services/wallet.ts";
-import { dim, formatAmount, truncateAddress } from "../../utils/format.ts";
+import {
+	dim,
+	formatAmount,
+	parseAmountOrPercent,
+	truncateAddress,
+} from "../../utils/format.ts";
 import { confirm, keyValue, prompt, promptPassword } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
@@ -536,11 +541,10 @@ export async function transfer(args: ParsedArgs): Promise<void> {
 		}
 	}
 
-	const amount = parseUnits(amountStr, tokenInfo.decimals);
 	const walletName = getActiveWalletName();
 	const fromAddress = getStoredAddress()!;
 
-	// Check balance
+	// Check balance (needed for percentage calculation too)
 	let balance: bigint;
 	if (isNative) {
 		balance = await getBalance(fromAddress as Address);
@@ -548,16 +552,32 @@ export async function transfer(args: ParsedArgs): Promise<void> {
 		balance = await getTokenBalance(fromAddress as Address, tokenInfo.address);
 	}
 
-	if (balance < amount) {
+	// Parse amount (supports percentage like "50%" or "100%")
+	const parsed = parseAmountOrPercent(
+		amountStr,
+		tokenInfo.decimals,
+		balance,
+		tokenInfo.symbol,
+	);
+
+	if (parsed.isPercentage) {
+		console.log(
+			dim(
+				`  ${amountStr} of balance = ${parsed.displayAmount} ${tokenInfo.symbol}`,
+			),
+		);
+	}
+
+	if (balance < parsed.amount) {
 		throw new Error(
-			`Insufficient ${tokenInfo.symbol} balance. Have: ${formatAmount(balance, tokenInfo.decimals)}, Need: ${amountStr}`,
+			`Insufficient ${tokenInfo.symbol} balance. Have: ${formatAmount(balance, tokenInfo.decimals)}, Need: ${parsed.displayAmount}`,
 		);
 	}
 
 	console.log();
 	consola.box({
 		title: "💸 Transfer",
-		message: `Transfer ${amountStr} ${tokenInfo.symbol}
+		message: `Transfer ${parsed.displayAmount} ${tokenInfo.symbol}
 
 From: ${walletName} (${truncateAddress(fromAddress as Address)})
 To:   ${truncateAddress(toAddress as Address)}`,
@@ -583,9 +603,9 @@ To:   ${truncateAddress(toAddress as Address)}`,
 
 	let hash: `0x${string}`;
 	if (isNative) {
-		hash = await transferNative(toAddress as Address, amount);
+		hash = await transferNative(toAddress as Address, parsed.amount);
 	} else {
-		hash = await transferToken(tokenInfo.address, toAddress as Address, amount);
+		hash = await transferToken(tokenInfo.address, toAddress as Address, parsed.amount);
 	}
 
 	consola.start(`Transaction sent: ${truncateAddress(hash as Address)}`);
@@ -600,7 +620,7 @@ To:   ${truncateAddress(toAddress as Address)}`,
 		console.log(
 			keyValue(
 				{
-					Amount: `${amountStr} ${tokenInfo.symbol}`,
+					Amount: `${parsed.displayAmount} ${tokenInfo.symbol}`,
 					To: toAddress,
 					"Tx Hash": hash,
 					Block: receipt.blockNumber.toString(),

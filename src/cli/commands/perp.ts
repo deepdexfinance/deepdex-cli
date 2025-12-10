@@ -8,6 +8,7 @@ import { network } from "../../abis/config.ts";
 import { loadConfig } from "../../config/index.ts";
 import {
 	findMarket,
+	getFreeDeposit,
 	getOraclePrices,
 	getPublicClient,
 	getUserSubaccounts,
@@ -19,7 +20,11 @@ import {
 	unlockWallet,
 	walletExists,
 } from "../../services/wallet.ts";
-import { MAX_LEVERAGE, PRICE_DECIMALS } from "../../utils/constants.ts";
+import {
+	MAX_LEVERAGE,
+	PRICE_DECIMALS,
+	USDC_DECIMALS,
+} from "../../utils/constants.ts";
 import {
 	dim,
 	formatLeverage,
@@ -55,7 +60,7 @@ async function executePerpOrder(
 	await ensureUnlocked();
 
 	const pair = requireArg(args.positional, 0, "pair");
-	const amount = requireArg(args.positional, 1, "amount");
+	const amountStr = requireArg(args.positional, 1, "amount");
 	const leverage =
 		getFlag<number>(args.raw, "lev") ||
 		getFlag<number>(args.raw, "leverage") ||
@@ -93,27 +98,79 @@ async function executePerpOrder(
 		throw new Error(`Max leverage for ${pair} is ${market.leverage}x`);
 	}
 
-	const finalAmount = formatToSize(amount, market.stepSize);
+	// Get subaccount for percentage calculation
+	const account = getAccount();
+	const subaccounts = await getUserSubaccounts(account.address);
+	const subaccount = subaccounts.find((s) => s.name === accountName);
 
-	// For market orders, get oracle price as the finalPrice
-	let finalPrice: string | undefined;
+	if (!subaccount) {
+		throw new Error(`Subaccount '${accountName}' not found.`);
+	}
+
+	// Fetch oracle price (needed for percentage calculation and market orders)
+	const oraclePrices = await getOraclePrices();
+	const baseSymbol = market.tokens[0]?.symbol || "";
+	const oraclePrice = oraclePrices.find(
+		(p) => p.symbol.toUpperCase() === baseSymbol.toUpperCase(),
+	)?.price;
+
+	if (!oraclePrice) {
+		throw new Error(
+			`Could not determine oracle price for ${baseSymbol}. Cannot place order.`,
+		);
+	}
+
+	// Handle percentage-based amount
+	let finalAmount: string;
+	let isPercentage = false;
+
+	if (amountStr.endsWith("%")) {
+		isPercentage = true;
+		const percentage = Number.parseFloat(amountStr.slice(0, -1));
+		if (Number.isNaN(percentage) || percentage <= 0 || percentage > 100) {
+			throw new Error("Invalid percentage. Must be between 0 and 100.");
+		}
+
+		// Get available margin (free deposit)
+		const freeDeposit = await getFreeDeposit(subaccount.address);
+		if (freeDeposit === 0n) {
+			throw new Error("No available margin in subaccount.");
+		}
+
+		// Calculate position value: (freeDeposit * percentage / 100) * leverage
+		const marginToUse =
+			(freeDeposit * BigInt(Math.round(percentage * 100))) / 10000n;
+		const positionValue = marginToUse * BigInt(leverage);
+
+		// Convert position value to base asset amount: positionValue / oraclePrice
+		// positionValue is in USDC (6 decimals), oraclePrice is in PRICE_DECIMALS (6)
+		// Result should be in base token decimals
+		const baseDecimals = market.tokens[0].decimals;
+		// positionValue (USD with 6 decimals) / price (with 6 decimals) = amount with baseDecimals
+		const positionSize =
+			(positionValue * 10n ** BigInt(baseDecimals)) / oraclePrice;
+
+		finalAmount = formatToSize(
+			formatUnits(positionSize, baseDecimals),
+			market.stepSize,
+		);
+
+		const marginUsedStr = formatUnits(marginToUse, USDC_DECIMALS);
+		console.log(
+			dim(
+				`  ${amountStr} of margin ($${marginUsedStr}) × ${leverage}x = ${finalAmount} ${baseSymbol}`,
+			),
+		);
+	} else {
+		finalAmount = formatToSize(amountStr, market.stepSize);
+	}
+
+	// Determine price for order
+	let finalPrice: string;
 	if (price) {
 		finalPrice = formatToSize(price, market.tickSize);
 	} else {
-		// Market order: fetch oracle price
-		const oraclePrices = await getOraclePrices();
-		const baseSymbol = market.tokens[0]?.symbol || "";
-		const oraclePrice = oraclePrices.find(
-			(p) => p.symbol.toUpperCase() === baseSymbol.toUpperCase(),
-		)?.price;
-
-		if (!oraclePrice) {
-			throw new Error(
-				`Could not determine oracle price for ${baseSymbol}. Cannot place market order.`,
-			);
-		}
-
-		// Format oracle price (stored with PRICE_DECIMALS = 6)
+		// Market order: use oracle price
 		finalPrice = formatToSize(
 			formatUnits(oraclePrice, PRICE_DECIMALS),
 			market.tickSize,
@@ -172,14 +229,6 @@ Account: ${accountName}`,
 	consola.start("Opening position...");
 
 	try {
-		const account = getAccount();
-		const subaccounts = await getUserSubaccounts(account.address);
-		const subaccount = subaccounts.find((s) => s.name === accountName);
-
-		if (!subaccount) {
-			throw new Error(`Subaccount '${accountName}' not found.`);
-		}
-
 		const marketId = Number.parseInt(market.pairId, 10);
 		const isLong = side === "long";
 		const sizeBigInt = parseUnits(finalAmount, market.tokens[0].decimals);

@@ -1,7 +1,73 @@
 import BigNumber from "bignumber.js";
 import { consola } from "consola";
-import { type Address, formatUnits } from "viem";
+import { type Address, formatUnits, parseUnits } from "viem";
 import { COLORS, SYMBOLS, USDC_DECIMALS } from "./constants.ts";
+
+// ============================================================================
+// Amount Parsing
+// ============================================================================
+
+/**
+ * Result of parsing an amount that may be a percentage
+ */
+export interface ParsedAmount {
+	amount: bigint;
+	displayAmount: string;
+	isPercentage: boolean;
+	percentage?: number;
+}
+
+/**
+ * Parse an amount string that can be either an absolute value or a percentage.
+ * Examples: "1000", "50%", "100%"
+ *
+ * @param amountStr - The amount string to parse (e.g., "1000" or "50%")
+ * @param decimals - The token decimals for parsing
+ * @param balance - The balance to calculate percentage from (required if amountStr is a percentage)
+ * @param tokenSymbol - Optional token symbol for error messages
+ * @returns ParsedAmount with the calculated amount and display info
+ */
+export function parseAmountOrPercent(
+	amountStr: string,
+	decimals: number,
+	balance?: bigint,
+	tokenSymbol?: string,
+): ParsedAmount {
+	if (amountStr.endsWith("%")) {
+		const percentage = Number.parseFloat(amountStr.slice(0, -1));
+		if (Number.isNaN(percentage) || percentage <= 0 || percentage > 100) {
+			throw new Error("Invalid percentage. Must be between 0 and 100.");
+		}
+
+		if (balance === undefined) {
+			throw new Error("Balance is required when using percentage amount.");
+		}
+
+		if (balance === 0n) {
+			const tokenMsg = tokenSymbol ? ` ${tokenSymbol}` : "";
+			throw new Error(`No${tokenMsg} balance available.`);
+		}
+
+		// Calculate amount based on percentage (using 2 decimal precision for percentage)
+		const amount = (balance * BigInt(Math.round(percentage * 100))) / 10000n;
+		const displayAmount = formatUnits(amount, decimals);
+
+		return {
+			amount,
+			displayAmount,
+			isPercentage: true,
+			percentage,
+		};
+	}
+
+	// Regular amount
+	const amount = parseUnits(amountStr, decimals);
+	return {
+		amount,
+		displayAmount: amountStr,
+		isPercentage: false,
+	};
+}
 
 // ============================================================================
 // Number Formatting

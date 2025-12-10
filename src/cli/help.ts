@@ -105,8 +105,8 @@ const COMMANDS: Record<string, CommandHelp> = {
 		usage: "deepdex wallet transfer <amount> <token> [recipient]",
 		examples: [
 			"deepdex wallet transfer 10 USDC trading",
-			"deepdex wallet transfer 0.5 tDGAS 0x1234...",
-			"deepdex wallet transfer 1 ETH --to 0x5678...",
+			"deepdex wallet transfer 50% USDC trading",
+			"deepdex wallet transfer 100% tDGAS 0x1234...",
 		],
 		options: [
 			{ flag: "--to", description: "Recipient address or wallet name" },
@@ -139,14 +139,19 @@ const COMMANDS: Record<string, CommandHelp> = {
 		usage: "deepdex account deposit <amount> <token>",
 		examples: [
 			"deepdex account deposit 1000 USDC",
-			"deepdex account deposit 0.5 tDGAS --account trading-main",
+			"deepdex account deposit 50% USDC",
+			"deepdex account deposit 100% tDGAS --account trading-main",
 		],
 		options: [{ flag: "--account, -a", description: "Target subaccount name" }],
 	},
 	"account withdraw": {
 		description: "Withdraw tokens from a subaccount",
 		usage: "deepdex account withdraw <amount> <token>",
-		examples: ["deepdex account withdraw 500 USDC"],
+		examples: [
+			"deepdex account withdraw 500 USDC",
+			"deepdex account withdraw 50% USDC",
+			"deepdex account withdraw 100% ETH --account trading-main",
+		],
 		options: [{ flag: "--account, -a", description: "Source subaccount name" }],
 	},
 	faucet: {
@@ -208,8 +213,8 @@ const COMMANDS: Record<string, CommandHelp> = {
 		usage: "deepdex spot buy <pair> <amount> [options]",
 		examples: [
 			"deepdex spot buy ETH/USDC 1.5",
+			"deepdex spot buy ETH/USDC 50%",
 			"deepdex spot buy ETH/USDC 1.5 --price 2000",
-			"deepdex spot buy ETH/USDC 1.5 --price 2000 --post-only",
 		],
 		options: [
 			{
@@ -225,7 +230,8 @@ const COMMANDS: Record<string, CommandHelp> = {
 		usage: "deepdex spot sell <pair> <amount> [options]",
 		examples: [
 			"deepdex spot sell ETH/USDC 1.5",
-			"deepdex spot sell ETH/USDC 1.5 --price 2100",
+			"deepdex spot sell ETH/USDC 50%",
+			"deepdex spot sell ETH/USDC 100% --reduce-only",
 		],
 		options: [
 			{
@@ -252,7 +258,8 @@ const COMMANDS: Record<string, CommandHelp> = {
 		usage: "deepdex perp long <pair> <amount> [options]",
 		examples: [
 			"deepdex perp long ETH-USDC 1.5 --lev 10",
-			"deepdex perp long ETH-USDC 1.5 --lev 10 --price 2000 --tp 2200 --sl 1900",
+			"deepdex perp long ETH-USDC 50% --lev 10",
+			"deepdex perp long ETH-USDC 100% --lev 5 --tp 2200 --sl 1900",
 		],
 		options: [
 			{
@@ -277,7 +284,8 @@ const COMMANDS: Record<string, CommandHelp> = {
 		usage: "deepdex perp short <pair> <amount> [options]",
 		examples: [
 			"deepdex perp short SOL-USDC 50 --lev 5",
-			"deepdex perp short SOL-USDC 50 --lev 5 --tp 20 --sl 28",
+			"deepdex perp short SOL-USDC 25% --lev 3",
+			"deepdex perp short SOL-USDC 100% --lev 2 --tp 20 --sl 28",
 		],
 		options: [
 			{
@@ -355,8 +363,9 @@ const COMMANDS: Record<string, CommandHelp> = {
 		examples: [
 			"deepdex position close ETH-USDC",
 			"deepdex position close ETH-USDC --size 0.5",
+			"deepdex position close ETH-USDC --size 50%",
 		],
-		options: [{ flag: "--size", description: "Partial close size" }],
+		options: [{ flag: "--size", description: "Partial close size (number or %)" }],
 	},
 	"position modify": {
 		description: "Modify take-profit and stop-loss levels",
