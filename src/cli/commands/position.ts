@@ -5,9 +5,11 @@
 import { consola } from "consola";
 import { parseUnits } from "viem";
 import { network } from "../../abis/config.ts";
+import { loadConfig } from "../../config/index.ts";
 import {
 	closePosition,
 	findMarket,
+	getOraclePrices,
 	getPositions,
 	getPublicClient,
 	getUserSubaccounts,
@@ -226,6 +228,14 @@ Size: ${size || "Full position"}`,
 		const marketId = Number.parseInt(market.pairId, 10);
 		let hash: `0x${string}`;
 
+		// Get oracle price for market orders
+		const baseToken = market.tokens[0];
+		if (!baseToken)
+			throw new Error("Invalid market configuration: missing base token");
+		const oraclePrices = await getOraclePrices();
+		const priceObj = oraclePrices.find((p) => p.symbol === baseToken.symbol);
+		if (!priceObj) throw new Error("Oracle price not available");
+
 		if (size) {
 			// Partial close
 			const positions = await getPositions(address);
@@ -242,8 +252,8 @@ Size: ${size || "Full position"}`,
 				marketId,
 				isLong,
 				size: sizeBigInt,
-				price: 0n,
-				orderType: 0,
+				price: priceObj.price, // Oracle price for market orders
+				orderType: 0, // Market
 				leverage: position.leverage,
 				takeProfit: 0n,
 				stopLoss: 0n,
@@ -252,7 +262,16 @@ Size: ${size || "Full position"}`,
 			});
 		} else {
 			// Full close
-			hash = await closePosition(subaccount.address, marketId, 0n, 0n);
+			const userConfig = loadConfig();
+			const slippageBps = BigInt(
+				Math.round((userConfig.trading.max_slippage || 0.5) * 100),
+			);
+			hash = await closePosition(
+				subaccount.address,
+				marketId,
+				priceObj.price,
+				slippageBps,
+			);
 		}
 
 		const client = getPublicClient();

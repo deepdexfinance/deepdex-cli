@@ -27,37 +27,37 @@ const STRATEGIES: {
 	riskLevel: string;
 	marketType: "Spot" | "Perp" | "Both";
 }[] = [
-		{
-			name: "grid",
-			description: "Grid trading - places orders at regular price intervals",
-			riskLevel: "Medium",
-			marketType: "Spot",
-		},
-		{
-			name: "mm",
-			description: "Market making - provides liquidity on both sides",
-			riskLevel: "High",
-			marketType: "Spot",
-		},
-		{
-			name: "arbitrage",
-			description: "Arbitrage - exploits price differences across markets",
-			riskLevel: "Low",
-			marketType: "Both",
-		},
-		{
-			name: "simple",
-			description: "Simple DCA - dollar cost averaging at intervals",
-			riskLevel: "Low",
-			marketType: "Spot",
-		},
-		{
-			name: "momentum",
-			description: "Momentum - trend following using moving averages",
-			riskLevel: "High",
-			marketType: "Perp",
-		},
-	];
+	{
+		name: "grid",
+		description: "Grid trading - places orders at regular price intervals",
+		riskLevel: "Medium",
+		marketType: "Spot",
+	},
+	{
+		name: "mm",
+		description: "Market making - provides liquidity on both sides",
+		riskLevel: "High",
+		marketType: "Spot",
+	},
+	{
+		name: "arbitrage",
+		description: "Arbitrage - exploits price differences across markets",
+		riskLevel: "Low",
+		marketType: "Both",
+	},
+	{
+		name: "simple",
+		description: "Simple DCA - dollar cost averaging at intervals",
+		riskLevel: "Low",
+		marketType: "Spot",
+	},
+	{
+		name: "momentum",
+		description: "Momentum - trend following using moving averages",
+		riskLevel: "High",
+		marketType: "Perp",
+	},
+];
 
 // ============================================================================
 // Commands
@@ -213,7 +213,7 @@ Mode: ${daemon ? "Background (daemon)" : "Foreground"}`,
 			console.log(dim("  Watching for trading opportunities..."));
 
 			// Keep process alive for simulation
-			await new Promise(() => { });
+			await new Promise(() => {});
 		}
 	}
 

@@ -1,6 +1,7 @@
 import BigNumber from "bignumber.js";
 import { consola } from "consola";
 import { type Hex, parseUnits } from "viem";
+import { loadConfig } from "../../../config/index.ts";
 import {
 	closePosition,
 	findMarket,
@@ -137,8 +138,8 @@ export async function run(config: BotConfig): Promise<void> {
 						marketId: perpMarketId,
 						isLong: false,
 						size: sizeBN,
-						price: 0n,
-						orderType: 0,
+						price: oraclePrice, // Oracle price for market orders
+						orderType: 0, // Market
 						leverage: 1,
 						takeProfit: 0n,
 						stopLoss: 0n,
@@ -158,11 +159,18 @@ export async function run(config: BotConfig): Promise<void> {
 
 					// 1. Close Perp
 					consola.info("Closing Perp Short...");
+					const userConfig = loadConfig();
+					const slippageBps = BigInt(
+						Math.round((userConfig.trading.max_slippage || 0.5) * 100),
+					);
+					const closingOraclePrice = marketData.oracle_price;
+					if (!closingOraclePrice)
+						throw new Error("Oracle price not available");
 					await closePosition(
 						subaccount.address,
 						perpMarketId,
-						0n,
-						1000000000000000000n,
+						closingOraclePrice,
+						slippageBps,
 					);
 
 					// 2. Sell Spot

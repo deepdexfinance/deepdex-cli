@@ -1,6 +1,7 @@
 import BigNumber from "bignumber.js";
 import { consola } from "consola";
 import { parseUnits } from "viem";
+import { loadConfig } from "../../../config/index.ts";
 import {
 	closePosition,
 	findMarket,
@@ -130,11 +131,15 @@ export async function run(config: BotConfig): Promise<void> {
 					if (position && !position.is_long) {
 						// Close Short
 						consola.info("Signal LONG. Closing Short...");
+						const userConfig = loadConfig();
+						const slippageBps = BigInt(
+							Math.round((userConfig.trading.max_slippage || 0.5) * 100),
+						);
 						await closePosition(
 							subaccount.address,
 							marketId,
-							0n,
-							1000000000000000000n,
+							priceObj.price,
+							slippageBps,
 						); // Market close
 					}
 
@@ -151,8 +156,8 @@ export async function run(config: BotConfig): Promise<void> {
 							marketId,
 							isLong: true,
 							size: sizeBN,
-							price: 0n, // Market
-							orderType: 0, // Market (assuming 0 based on perp.ts logic check? Wait, perp.ts used 1 for limit. So 0 is market?)
+							price: priceObj.price, // Oracle price for market orders
+							orderType: 0, // Market
 							leverage,
 							takeProfit: 0n,
 							stopLoss: 0n,
@@ -166,11 +171,15 @@ export async function run(config: BotConfig): Promise<void> {
 					if (position?.is_long) {
 						// Close Long
 						consola.info("Signal SHORT. Closing Long...");
+						const userConfig = loadConfig();
+						const slippageBps = BigInt(
+							Math.round((userConfig.trading.max_slippage || 0.5) * 100),
+						);
 						await closePosition(
 							subaccount.address,
 							marketId,
-							0n,
-							1000000000000000000n,
+							priceObj.price,
+							slippageBps,
 						);
 					}
 
@@ -187,8 +196,8 @@ export async function run(config: BotConfig): Promise<void> {
 							marketId,
 							isLong: false,
 							size: sizeBN,
-							price: 0n,
-							orderType: 0,
+							price: priceObj.price, // Oracle price for market orders
+							orderType: 0, // Market
 							leverage,
 							takeProfit: 0n,
 							stopLoss: 0n,
