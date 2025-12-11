@@ -405,30 +405,6 @@ export async function startServer() {
 			}
 		},
 	);
-
-	// Resource: README.md
-	server.registerResource(
-		"guide",
-		"deepdex://guide",
-		{ mimeType: "text/markdown" },
-		async (uri) => {
-			const guidePath = path.resolve(__dirname, "../../GUIDE.md");
-			try {
-				const text = await readFile(guidePath, "utf-8");
-				return {
-					contents: [
-						{
-							uri: uri.href,
-							mimeType: "text/markdown",
-							text,
-						},
-					],
-				};
-			} catch (e) {
-				throw new Error(`Failed to read README.md: ${(e as Error).message}`);
-			}
-		},
-	);
 	const transport = new StdioServerTransport();
 	await server.connect(transport);
 }
