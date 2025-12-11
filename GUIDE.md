@@ -174,6 +174,18 @@ deepdex wallet create trading    # Create wallet named "trading"
 deepdex wallet create bot-wallet
 ```
 
+**Automation (non-interactive):**
+```bash
+# Using environment variable
+DEEPDEX_NEW_WALLET_PASSWORD="mypassword" deepdex wallet create bot-1
+
+# Using --password flag
+deepdex wallet create bot-2 --password mypassword123
+```
+
+**Options:**
+- `--password <password>` - Password for wallet encryption (for automation)
+
 #### `deepdex wallet switch <name>`
 Switch the active wallet.
 ```bash
@@ -206,6 +218,18 @@ Import wallet from private key.
 deepdex wallet import 0x...                # Import as auto-named wallet
 deepdex wallet import 0x... trading        # Import as "trading"
 ```
+
+**Automation (non-interactive):**
+```bash
+# Using environment variable
+DEEPDEX_NEW_WALLET_PASSWORD="mypassword" deepdex wallet import 0x... my-wallet
+
+# Using --password flag
+deepdex wallet import 0x... my-wallet --password mypassword123
+```
+
+**Options:**
+- `--password <password>` - Password for wallet encryption (for automation)
 
 #### `deepdex wallet sign <message>`
 Sign an arbitrary message with your wallet.
@@ -592,6 +616,32 @@ These flags work with all commands:
 | `--verbose, -v` | Show detailed output |
 | `--dry-run` | Simulate without executing |
 | `--help, -h` | Show help for command |
+| `--password` | Wallet password (for wallet create/import) |
+
+---
+
+## 🔑 Environment Variables
+
+For automation and non-interactive use:
+
+| Variable | Description |
+|----------|-------------|
+| `DEEPDEX_WALLET_PASSWORD` | Password for unlocking existing wallets |
+| `DEEPDEX_NEW_WALLET_PASSWORD` | Password for creating/importing new wallets |
+| `DEEPDEX_NON_INTERACTIVE` | Set to "true" to fail instead of prompting |
+
+**Example Usage:**
+```bash
+# Create multiple wallets in a script
+export DEEPDEX_NEW_WALLET_PASSWORD="mypassword"
+for i in {1..10}; do
+  deepdex wallet create "bot-$i"
+done
+
+# Run bot with password from env
+export DEEPDEX_WALLET_PASSWORD="mypassword"
+deepdex pm start my-bot momentum --config ./config.json --yes
+```
 
 ---
 

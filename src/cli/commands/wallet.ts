@@ -160,9 +160,14 @@ export async function list(args: ParsedArgs): Promise<void> {
 
 /**
  * Create a new wallet
+ *
+ * Supports automated creation via:
+ * - --password flag: deepdex wallet create myWallet --password mypassword
+ * - ENV variable: DEEPDEX_NEW_WALLET_PASSWORD=mypassword deepdex wallet create myWallet
  */
 export async function create(args: ParsedArgs): Promise<void> {
 	const name = args.positional[0];
+	const flagPassword = getFlag<string | number>(args.raw, "password");
 
 	if (name && walletNameExists(name)) {
 		throw new Error(`Wallet "${name}" already exists.`);
@@ -181,7 +186,10 @@ export async function create(args: ParsedArgs): Promise<void> {
 
 	console.log();
 
-	const password = await getNewPassword({ message: "Create a password: " });
+	const password = await getNewPassword({
+		message: "Create a password: ",
+		flagPassword,
+	});
 
 	consola.start("Creating wallet...");
 	const address = await createWallet(password, name);
@@ -334,10 +342,15 @@ Exporting key for wallet: ${walletName}`,
 
 /**
  * Import wallet from private key
+ *
+ * Supports automated import via:
+ * - --password flag: deepdex wallet import 0x... myWallet --password mypassword
+ * - ENV variable: DEEPDEX_NEW_WALLET_PASSWORD=mypassword deepdex wallet import 0x... myWallet
  */
 export async function importKey(args: ParsedArgs): Promise<void> {
 	const privateKey = requireArg(args.positional, 0, "private_key");
 	const name = args.positional[1] || getFlag<string>(args.raw, "name");
+	const flagPassword = getFlag<string | number>(args.raw, "password");
 
 	if (!privateKey.startsWith("0x") || privateKey.length !== 66) {
 		throw new Error(
@@ -364,7 +377,10 @@ export async function importKey(args: ParsedArgs): Promise<void> {
 
 	console.log();
 
-	const password = await getNewPassword({ message: "Create a password: " });
+	const password = await getNewPassword({
+		message: "Create a password: ",
+		flagPassword,
+	});
 
 	consola.start("Importing wallet...");
 	const address = await importWallet(privateKey, password, name);

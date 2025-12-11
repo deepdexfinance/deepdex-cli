@@ -62,11 +62,15 @@ const COMMANDS: Record<string, CommandHelp> = {
 	},
 	"wallet create": {
 		description: "Create a new wallet with optional name",
-		usage: "deepdex wallet create [name]",
+		usage: "deepdex wallet create [name] [options]",
 		examples: [
 			"deepdex wallet create",
 			"deepdex wallet create trading",
-			"deepdex wallet create bot-wallet",
+			"deepdex wallet create bot-wallet --password mypassword123",
+			"DEEPDEX_NEW_WALLET_PASSWORD=mypass deepdex wallet create bot-1",
+		],
+		options: [
+			{ flag: "--password", description: "Wallet password (for automation)" },
 		],
 	},
 	"wallet switch": {
@@ -94,10 +98,14 @@ const COMMANDS: Record<string, CommandHelp> = {
 	},
 	"wallet import": {
 		description: "Import wallet from private key",
-		usage: "deepdex wallet import <private_key> [name]",
+		usage: "deepdex wallet import <private_key> [name] [options]",
 		examples: [
 			"deepdex wallet import 0x...",
 			"deepdex wallet import 0x... trading",
+			"deepdex wallet import 0x... my-wallet --password mypassword123",
+		],
+		options: [
+			{ flag: "--password", description: "Wallet password (for automation)" },
 		],
 	},
 	"wallet transfer": {
@@ -573,8 +581,9 @@ ${bold("GLOBAL OPTIONS")}
   --help, -h        Show help
 
 ${bold("ENVIRONMENT VARIABLES")}
-  DEEPDEX_WALLET_PASSWORD   Wallet password for non-interactive use
-  DEEPDEX_NON_INTERACTIVE   Set to "true" to fail instead of prompting`,
+  DEEPDEX_WALLET_PASSWORD       Wallet password for non-interactive use
+  DEEPDEX_NEW_WALLET_PASSWORD   Password for wallet creation/import (automation)
+  DEEPDEX_NON_INTERACTIVE       Set to "true" to fail instead of prompting`,
 		style: {
 			padding: 1,
 			borderColor: "magentaBright",

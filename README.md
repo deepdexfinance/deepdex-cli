@@ -9,19 +9,19 @@ A high-performance CLI trading bot and utility suite for the DeepDex protocol. T
 ### Quick Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/deepdex/deepdex/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/deepdexfinance/deepdex-cli/main/install.sh | bash
 ```
 
 Or with wget:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/deepdex/deepdex/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/deepdexfinance/deepdex-cli/main/install.sh | bash
 ```
 
 ### Manual Install
 
 ```bash
-git clone https://github.com/deepdex/deepdex.git ~/.deepdex
+git clone https://github.com/deepdexfinance/deepdex-cli.git ~/.deepdex
 cd ~/.deepdex
 bun install
 ```
@@ -60,6 +60,32 @@ deepdex pm start eth-grid grid --config ./configs/grid.json
 deepdex pm start btc-dca simple --config ./configs/dca.json
 deepdex pm ps  # List all running processes
 ```
+
+## 🔐 Automation & Scripting
+
+For non-interactive use (CI/CD, scripts, multiple bots):
+
+```bash
+# Create wallets programmatically
+DEEPDEX_NEW_WALLET_PASSWORD="mypassword" deepdex wallet create bot-1
+# Or use --password flag
+deepdex wallet create bot-2 --password mypassword
+
+# Unlock wallet from env for transactions
+export DEEPDEX_WALLET_PASSWORD="mypassword"
+deepdex wallet transfer 100 USDC bot-1 --yes
+deepdex account deposit 100% USDC --yes
+
+# Start bot processes in background
+deepdex pm start my-bot momentum --config ./config.json --yes
+```
+
+**Environment Variables:**
+| Variable | Description |
+|----------|-------------|
+| `DEEPDEX_WALLET_PASSWORD` | Password for unlocking existing wallets |
+| `DEEPDEX_NEW_WALLET_PASSWORD` | Password for creating/importing wallets |
+| `DEEPDEX_NON_INTERACTIVE` | Set to "true" to fail instead of prompting |
 
 ## 🚀 Features
 
@@ -109,6 +135,12 @@ The bot comes with several built-in strategies that can be configured in `.deepd
     *   Exploits positive funding rates by shorting the perpetual contract and buying the spot asset (Delta Neutral).
     *   Earns funding fees while hedging price risk.
     *   Automatically sells spot position when closing the arbitrage.
+
+- **Automation & Scripting**
+  - Non-interactive wallet creation with `--password` flag
+  - Environment variables for password handling
+  - Batch operations with `--yes` flag
+  - JSON output for scripting
 
 - **Developer Experience**
   - Built with [Bun](https://bun.sh) for speed

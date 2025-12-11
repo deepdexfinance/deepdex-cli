@@ -57,10 +57,10 @@ export function table(
 	// Top border
 	lines.push(
 		SYMBOLS.corner.tl +
-			widths
-				.map((w) => SYMBOLS.border.h.repeat(w + 2))
-				.join(SYMBOLS.border.tee.t) +
-			SYMBOLS.corner.tr,
+		widths
+			.map((w) => SYMBOLS.border.h.repeat(w + 2))
+			.join(SYMBOLS.border.tee.t) +
+		SYMBOLS.corner.tr,
 	);
 
 	// Header row
@@ -69,17 +69,17 @@ export function table(
 	);
 	lines.push(
 		SYMBOLS.border.v +
-			headerCells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
-			SYMBOLS.border.v,
+		headerCells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
+		SYMBOLS.border.v,
 	);
 
 	// Header separator
 	lines.push(
 		SYMBOLS.border.tee.l +
-			widths
-				.map((w) => SYMBOLS.border.h.repeat(w + 2))
-				.join(SYMBOLS.border.cross) +
-			SYMBOLS.border.tee.r,
+		widths
+			.map((w) => SYMBOLS.border.h.repeat(w + 2))
+			.join(SYMBOLS.border.cross) +
+		SYMBOLS.border.tee.r,
 	);
 
 	// Data rows
@@ -89,18 +89,18 @@ export function table(
 		);
 		lines.push(
 			SYMBOLS.border.v +
-				cells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
-				SYMBOLS.border.v,
+			cells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
+			SYMBOLS.border.v,
 		);
 	}
 
 	// Bottom border
 	lines.push(
 		SYMBOLS.corner.bl +
-			widths
-				.map((w) => SYMBOLS.border.h.repeat(w + 2))
-				.join(SYMBOLS.border.tee.b) +
-			SYMBOLS.corner.br,
+		widths
+			.map((w) => SYMBOLS.border.h.repeat(w + 2))
+			.join(SYMBOLS.border.tee.b) +
+		SYMBOLS.corner.br,
 	);
 
 	return lines.join("\n");
@@ -143,14 +143,14 @@ export function box(title: string, content: string, width = 60): string {
 
 	lines.push(
 		borderColor +
-			SYMBOLS.corner.tl +
-			leftBorder +
-			reset +
-			bold(titlePadded) +
-			borderColor +
-			rightBorder +
-			SYMBOLS.corner.tr +
-			reset,
+		SYMBOLS.corner.tl +
+		leftBorder +
+		reset +
+		bold(titlePadded) +
+		borderColor +
+		rightBorder +
+		SYMBOLS.corner.tr +
+		reset,
 	);
 
 	// Content
@@ -166,10 +166,10 @@ export function box(title: string, content: string, width = 60): string {
 	// Bottom border
 	lines.push(
 		borderColor +
-			SYMBOLS.corner.bl +
-			SYMBOLS.border.h.repeat(innerWidth + 2) +
-			SYMBOLS.corner.br +
-			reset,
+		SYMBOLS.corner.bl +
+		SYMBOLS.border.h.repeat(innerWidth + 2) +
+		SYMBOLS.corner.br +
+		reset,
 	);
 
 	return lines.join("\n");
@@ -318,7 +318,7 @@ export async function getPassword(
 	if (isNonInteractive()) {
 		throw new Error(
 			`Password required but running in non-interactive mode. ` +
-				`Set ${envVarName} environment variable or provide --password flag.`,
+			`Set ${envVarName} environment variable or provide --password flag.`,
 		);
 	}
 
@@ -326,20 +326,87 @@ export async function getPassword(
 }
 
 /**
+ * Options for getNewPassword function
+ */
+export interface GetNewPasswordOptions {
+	/** Custom prompt message */
+	message?: string;
+	/** Password from --password flag (takes priority over env). Can be number if parsed from CLI. */
+	flagPassword?: string | number;
+	/** Allow reading from environment variable */
+	allowEnv?: boolean;
+	/** Custom env var name (defaults to DEEPDEX_NEW_WALLET_PASSWORD) */
+	envVarName?: string;
+}
+
+/** Default env var name for new wallet password */
+const ENV_NEW_WALLET_PASSWORD = "DEEPDEX_NEW_WALLET_PASSWORD";
+
+/**
  * Get password for wallet creation/import (with confirmation)
  * This is only for creating new wallets, not unlocking.
  *
- * @throws Error if non-interactive mode (creation always requires confirmation)
+ * Priority:
+ * 1. --password flag (if provided)
+ * 2. Environment variable (if allowEnv is true)
+ * 3. Interactive prompt with confirmation (if not in non-interactive mode)
+ *
+ * @throws Error if non-interactive mode and no password source available
+ *
+ * @example
+ * // Basic usage - prompts if needed
+ * const password = await getNewPassword();
+ *
+ * @example
+ * // With flag from CLI
+ * const password = await getNewPassword({ flagPassword: args.flags.password });
+ *
+ * @example
+ * // For automation (scripts)
+ * // Set DEEPDEX_NEW_WALLET_PASSWORD=mypassword
+ * const password = await getNewPassword({ allowEnv: true });
  */
 export async function getNewPassword(
-	options: { message?: string } = {},
+	options: GetNewPasswordOptions = {},
 ): Promise<string> {
-	const { message = "Create a password: " } = options;
+	const {
+		message = "Create a password: ",
+		flagPassword,
+		allowEnv = true,
+		envVarName = ENV_NEW_WALLET_PASSWORD,
+	} = options;
 
+	// Priority 1: --password flag
+	if (flagPassword !== undefined && flagPassword !== null) {
+		const passwordStr = String(flagPassword);
+		if (passwordStr.length > 0) {
+			if (passwordStr.length < 8) {
+				throw new Error("Password must be at least 8 characters.");
+			}
+			consola.info(dim("Using password from --password flag"));
+			return passwordStr;
+		}
+	}
+
+	// Priority 2: Environment variable
+	if (allowEnv) {
+		const envPassword = process.env[envVarName];
+		if (envPassword && envPassword.length > 0) {
+			if (envPassword.length < 8) {
+				throw new Error("Password must be at least 8 characters.");
+			}
+			consola.info(
+				dim(`Using password from ${envVarName} environment variable`),
+			);
+			return envPassword;
+		}
+	}
+
+	// Priority 3: Interactive prompt with confirmation
 	if (isNonInteractive()) {
 		throw new Error(
-			"Wallet creation requires interactive mode for password confirmation. " +
-				"Cannot create wallet in non-interactive mode.",
+			`Password required for wallet creation but running in non-interactive mode. ` +
+			`Set ${envVarName} environment variable or provide --password flag.`,
 		);
 	}
 
