@@ -24,6 +24,22 @@ export const DEFAULT_WALLET_NAME = "default";
 export const WALLET_STORE_VERSION = 1;
 
 // ============================================================================
+// Environment Variables
+// ============================================================================
+
+/**
+ * Environment variable for wallet password (for automation/CI).
+ * Priority: interactive prompt > --password flag > env var
+ */
+export const ENV_WALLET_PASSWORD = "DEEPDEX_WALLET_PASSWORD";
+
+/**
+ * Environment variable to enable non-interactive mode.
+ * When set to "true" or "1", will fail instead of prompting for input.
+ */
+export const ENV_NON_INTERACTIVE = "DEEPDEX_NON_INTERACTIVE";
+
+// ============================================================================
 // Default Configuration
 // ============================================================================
 

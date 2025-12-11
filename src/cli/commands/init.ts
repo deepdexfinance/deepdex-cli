@@ -23,7 +23,13 @@ import {
 	formatAmount,
 	truncateAddress,
 } from "../../utils/format.ts";
-import { confirm, prompt, promptPassword, select } from "../../utils/ui.ts";
+import {
+	confirm,
+	getNewPassword,
+	getPassword,
+	prompt,
+	select,
+} from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 
 /**
@@ -82,18 +88,9 @@ export async function run(_args: ParsedArgs): Promise<void> {
 		}
 
 		console.log();
-		const password = await promptPassword(
-			"Create a password to encrypt your wallet: ",
-		);
-		const confirmPwd = await promptPassword("Confirm password: ");
-
-		if (password !== confirmPwd) {
-			throw new Error("Passwords do not match");
-		}
-
-		if (password.length < 8) {
-			throw new Error("Password must be at least 8 characters");
-		}
+		const password = await getNewPassword({
+			message: "Create a password to encrypt your wallet: ",
+		});
 
 		consola.start("Importing wallet...");
 		address = await importWallet(privateKey, password);
@@ -101,18 +98,9 @@ export async function run(_args: ParsedArgs): Promise<void> {
 	} else {
 		// Create new wallet
 		console.log();
-		const password = await promptPassword(
-			"Create a password to encrypt your wallet: ",
-		);
-		const confirmPwd = await promptPassword("Confirm password: ");
-
-		if (password !== confirmPwd) {
-			throw new Error("Passwords do not match");
-		}
-
-		if (password.length < 8) {
-			throw new Error("Password must be at least 8 characters");
-		}
+		const password = await getNewPassword({
+			message: "Create a password to encrypt your wallet: ",
+		});
 
 		consola.start("Creating new wallet...");
 		address = await createWallet(password);
@@ -196,7 +184,7 @@ export async function quickstart(args: ParsedArgs): Promise<void> {
 		consola.success(`Wallet already configured: ${truncateAddress(address!)}`);
 
 		// Unlock wallet
-		const password = await promptPassword("Enter your wallet password: ");
+		const password = await getPassword();
 		await unlockWallet(password);
 		consola.success("Wallet unlocked");
 	}

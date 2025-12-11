@@ -4,7 +4,11 @@
 
 import * as readline from "node:readline";
 import { consola, createConsola } from "consola";
-import { SYMBOLS } from "./constants.ts";
+import {
+	ENV_NON_INTERACTIVE,
+	ENV_WALLET_PASSWORD,
+	SYMBOLS,
+} from "./constants.ts";
 import { bold, dim } from "./format.ts";
 
 // Create a custom consola instance for DeepDex
@@ -239,6 +243,118 @@ export async function promptPassword(message: string): Promise<string> {
 			resolve(answer);
 		});
 	});
+}
+
+/**
+ * Options for getPassword function
+ */
+export interface GetPasswordOptions {
+	/** Custom prompt message */
+	message?: string;
+	/** Password from --password flag (takes priority over env) */
+	flagPassword?: string;
+	/** Allow reading from environment variable */
+	allowEnv?: boolean;
+	/** Custom env var name (defaults to DEEPDEX_WALLET_PASSWORD) */
+	envVarName?: string;
+}
+
+/**
+ * Check if running in non-interactive mode
+ */
+export function isNonInteractive(): boolean {
+	const envValue = process.env[ENV_NON_INTERACTIVE];
+	return envValue === "true" || envValue === "1";
+}
+
+/**
+ * Get password with priority fallback:
+ * 1. --password flag (if provided)
+ * 2. Environment variable (if allowEnv is true)
+ * 3. Interactive prompt (if not in non-interactive mode)
+ *
+ * @throws Error if non-interactive mode and no password source available
+ *
+ * @example
+ * // Basic usage - prompts if needed
+ * const password = await getPassword();
+ *
+ * @example
+ * // With flag from CLI
+ * const password = await getPassword({ flagPassword: args.flags.password });
+ *
+ * @example
+ * // For automation (bot scripts)
+ * const password = await getPassword({ allowEnv: true });
+ */
+export async function getPassword(
+	options: GetPasswordOptions = {},
+): Promise<string> {
+	const {
+		message = "Enter wallet password: ",
+		flagPassword,
+		allowEnv = true,
+		envVarName = ENV_WALLET_PASSWORD,
+	} = options;
+
+	// Priority 1: --password flag
+	if (flagPassword && flagPassword.length > 0) {
+		return flagPassword;
+	}
+
+	// Priority 2: Environment variable
+	if (allowEnv) {
+		const envPassword = process.env[envVarName];
+		if (envPassword && envPassword.length > 0) {
+			// Log that we're using env password (but don't show it)
+			consola.info(
+				dim(`Using password from ${envVarName} environment variable`),
+			);
+			return envPassword;
+		}
+	}
+
+	// Priority 3: Interactive prompt
+	if (isNonInteractive()) {
+		throw new Error(
+			`Password required but running in non-interactive mode. ` +
+				`Set ${envVarName} environment variable or provide --password flag.`,
+		);
+	}
+
+	return promptPassword(message);
+}
+
+/**
+ * Get password for wallet creation/import (with confirmation)
+ * This is only for creating new wallets, not unlocking.
+ *
+ * @throws Error if non-interactive mode (creation always requires confirmation)
+ */
+export async function getNewPassword(
+	options: { message?: string } = {},
+): Promise<string> {
+	const { message = "Create a password: " } = options;
+
+	if (isNonInteractive()) {
+		throw new Error(
+			"Wallet creation requires interactive mode for password confirmation. " +
+				"Cannot create wallet in non-interactive mode.",
+		);
+	}
+
+	const password = await promptPassword(message);
+	const confirmPwd = await promptPassword("Confirm password: ");
+
+	if (password !== confirmPwd) {
+		throw new Error("Passwords do not match.");
+	}
+
+	if (password.length < 8) {
+		throw new Error("Password must be at least 8 characters.");
+	}
+
+	return password;
 }
 
 /**

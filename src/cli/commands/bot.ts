@@ -13,7 +13,7 @@ import {
 import type { BotStatus, BotStrategy } from "../../types/index.ts";
 import { BOT_LOG_PATH, BOT_PID_PATH } from "../../utils/constants.ts";
 import { bold, dim, formatDuration } from "../../utils/format.ts";
-import { confirm, promptPassword, promptPath, table } from "../../utils/ui.ts";
+import { confirm, getPassword, promptPath, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, optionalArg } from "../parser.ts";
 
@@ -71,8 +71,9 @@ export async function start(args: ParsedArgs): Promise<void> {
 		throw new Error("No wallet found. Run 'deepdex init' first.");
 	}
 
-	// Check if bot is already running
-	if (isBotRunning()) {
+	// Check if bot is already running (skip when launched by pm for multiple bots)
+	const isPmProcess = process.env.DEEPDEX_PM_PROCESS === "true";
+	if (!isPmProcess && isBotRunning()) {
 		const status = getBotStatus();
 		throw new Error(
 			`Bot is already running (PID: ${status.pid}, strategy: ${status.strategy})`,
@@ -106,7 +107,9 @@ export async function start(args: ParsedArgs): Promise<void> {
 
 	// Unlock wallet
 	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
+		const password = await getPassword({
+			flagPassword: getFlag<string>(args.raw, "password"),
+		});
 		await unlockWallet(password);
 	}
 
@@ -154,7 +157,7 @@ Mode: ${daemon ? "Background (daemon)" : "Foreground"}`,
 		}
 	}
 
-	// Save bot state
+	// Save bot state (skip for pm-managed processes - they use their own tracking)
 	ensureDirectories();
 	const botState = {
 		pid: process.pid,
@@ -163,14 +166,19 @@ Mode: ${daemon ? "Background (daemon)" : "Foreground"}`,
 		startedAt: Date.now(),
 		config: botConfig,
 	};
-	writeFileSync(BOT_PID_PATH, JSON.stringify(botState, null, 2));
+
+	if (!isPmProcess) {
+		writeFileSync(BOT_PID_PATH, JSON.stringify(botState, null, 2));
+	}
 
 	// Register cleanup handler for graceful shutdown (Ctrl+C)
 	const cleanup = () => {
 		console.log();
 		consola.info("Stopping bot...");
 		try {
-			unlinkSync(BOT_PID_PATH);
+			if (!isPmProcess) {
+				unlinkSync(BOT_PID_PATH);
+			}
 			consola.success("Bot stopped gracefully.");
 		} catch {
 			// File might already be removed

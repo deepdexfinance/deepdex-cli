@@ -36,7 +36,13 @@ import {
 	parseAmountOrPercent,
 	truncateAddress,
 } from "../../utils/format.ts";
-import { confirm, keyValue, prompt, promptPassword } from "../../utils/ui.ts";
+import {
+	confirm,
+	getNewPassword,
+	getPassword,
+	keyValue,
+	prompt,
+} from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
 
@@ -175,16 +181,7 @@ export async function create(args: ParsedArgs): Promise<void> {
 
 	console.log();
 
-	const password = await promptPassword("Create a password: ");
-	const confirmPwd = await promptPassword("Confirm password: ");
-
-	if (password !== confirmPwd) {
-		throw new Error("Passwords do not match.");
-	}
-
-	if (password.length < 8) {
-		throw new Error("Password must be at least 8 characters.");
-	}
+	const password = await getNewPassword({ message: "Create a password: " });
 
 	consola.start("Creating wallet...");
 	const address = await createWallet(password, name);
@@ -321,7 +318,7 @@ Exporting key for wallet: ${walletName}`,
 		return;
 	}
 
-	const password = await promptPassword("Enter wallet password: ");
+	const password = await getPassword();
 	const privateKey = await exportPrivateKey(password, walletName || undefined);
 
 	console.log();
@@ -367,16 +364,7 @@ export async function importKey(args: ParsedArgs): Promise<void> {
 
 	console.log();
 
-	const password = await promptPassword("Create a password: ");
-	const confirmPwd = await promptPassword("Confirm password: ");
-
-	if (password !== confirmPwd) {
-		throw new Error("Passwords do not match.");
-	}
-
-	if (password.length < 8) {
-		throw new Error("Password must be at least 8 characters.");
-	}
+	const password = await getNewPassword({ message: "Create a password: " });
 
 	consola.start("Importing wallet...");
 	const address = await importWallet(privateKey, password, name);
@@ -408,7 +396,7 @@ export async function sign(args: ParsedArgs): Promise<void> {
 	const walletName =
 		getFlag<string>(args.raw, "wallet") || getActiveWalletName();
 
-	const password = await promptPassword("Enter wallet password: ");
+	const password = await getPassword();
 	await unlockWallet(password, walletName || undefined);
 
 	consola.start("Signing message...");
@@ -596,7 +584,7 @@ To:   ${truncateAddress(toAddress as Address)}`,
 		return;
 	}
 
-	const password = await promptPassword("Enter wallet password: ");
+	const password = await getPassword();
 	await unlockWallet(password, walletName || undefined);
 
 	consola.start("Sending transaction...");
@@ -605,7 +593,11 @@ To:   ${truncateAddress(toAddress as Address)}`,
 	if (isNative) {
 		hash = await transferNative(toAddress as Address, parsed.amount);
 	} else {
-		hash = await transferToken(tokenInfo.address, toAddress as Address, parsed.amount);
+		hash = await transferToken(
+			tokenInfo.address,
+			toAddress as Address,
+			parsed.amount,
+		);
 	}
 
 	consola.start(`Transaction sent: ${truncateAddress(hash as Address)}`);

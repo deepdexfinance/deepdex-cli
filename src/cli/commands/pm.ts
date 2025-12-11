@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { consola } from "consola";
 import { ensureDirectories } from "../../config/index.ts";
 import {
+	getActiveWalletName,
 	isUnlocked,
 	unlockWallet,
 	walletExists,
@@ -23,7 +24,7 @@ import {
 	PROCESSES_PATH,
 } from "../../utils/constants.ts";
 import { bold, dim, formatDuration } from "../../utils/format.ts";
-import { confirm, promptPassword, table } from "../../utils/ui.ts";
+import { confirm, getPassword, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, optionalArg } from "../parser.ts";
 
@@ -171,6 +172,7 @@ export async function ps(args: ParsedArgs): Promise<void> {
 		Name: bold(p.name),
 		Strategy: p.strategy,
 		PID: String(p.pid),
+		Wallet: p.wallet || "-",
 		Account: p.account,
 		Status: p.running ? "🟢 running" : "🔴 stopped",
 		Uptime: p.running ? formatDuration(p.uptime || 0) : "-",
@@ -182,6 +184,7 @@ export async function ps(args: ParsedArgs): Promise<void> {
 				{ header: "Name", key: "Name" },
 				{ header: "Strategy", key: "Strategy" },
 				{ header: "PID", key: "PID" },
+				{ header: "Wallet", key: "Wallet" },
 				{ header: "Account", key: "Account" },
 				{ header: "Status", key: "Status" },
 				{ header: "Uptime", key: "Uptime" },
@@ -206,7 +209,6 @@ export async function start(args: ParsedArgs): Promise<void> {
 		| BotStrategy
 		| undefined;
 	const configPath = getFlag<string>(args.raw, "config");
-	const accountName = getFlag<string>(args.raw, "account") || "default";
 
 	if (!processName) {
 		throw new Error(
@@ -250,10 +252,32 @@ export async function start(args: ParsedArgs): Promise<void> {
 		}
 	}
 
-	// Unlock wallet
+	// Resolve account: CLI flag > config file > default
+	const accountName =
+		getFlag<string>(args.raw, "account") ||
+		(botConfig.account as string | undefined) ||
+		"main";
+
+	// Unlock wallet and capture password for child process
+	let walletPassword: string | undefined;
 	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
-		await unlockWallet(password);
+		walletPassword = await getPassword({
+			flagPassword: getFlag<string>(args.raw, "password"),
+		});
+		await unlockWallet(walletPassword);
+	} else {
+		// Wallet already unlocked - try to get password from env or flag for child process
+		walletPassword =
+			getFlag<string>(args.raw, "password") ||
+			process.env.DEEPDEX_WALLET_PASSWORD;
+
+		// If still no password, we need to prompt again for the child process
+		if (!walletPassword) {
+			consola.info("Wallet is unlocked, but child process needs password.");
+			walletPassword = await getPassword({
+				message: "Enter wallet password for background process: ",
+			});
+		}
 	}
 
 	console.log();
@@ -293,6 +317,18 @@ Config: ${configPath || "default"}`,
 	// Extract inner config if the JSON file has nested structure
 	const innerConfig = botConfig.config || botConfig;
 
+	// Build environment for child process
+	// Pass the wallet password via env so child can unlock wallet
+	const childEnv: Record<string, string | undefined> = {
+		...process.env,
+		FORCE_COLOR: "1",
+		DEEPDEX_PM_PROCESS: "true", // Skip "already running" check for multiple bots
+	};
+
+	if (walletPassword) {
+		childEnv.DEEPDEX_WALLET_PASSWORD = walletPassword;
+	}
+
 	// Create a wrapper script command that runs the bot
 	const child = spawn(
 		"bun",
@@ -310,26 +346,43 @@ Config: ${configPath || "default"}`,
 			cwd: process.cwd(),
 			detached: true,
 			stdio: ["ignore", "pipe", "pipe"],
-			env: { ...process.env, FORCE_COLOR: "1" },
+			env: childEnv,
 		},
 	);
 
-	// Write output to log file
-	const logStream = require("node:fs").createWriteStream(logFile, {
-		flags: "a",
+	// Handle spawn errors
+	let spawnError: Error | null = null;
+	child.on("error", (err) => {
+		spawnError = err;
 	});
-	child.stdout?.pipe(logStream);
-	child.stderr?.pipe(logStream);
 
-	// Unref so parent can exit
+	// Write output to log file
+	const fs = require("node:fs");
+	const logStream = fs.createWriteStream(logFile, { flags: "a" });
+
+	// Pipe output to log file but don't keep parent alive
+	if (child.stdout) {
+		child.stdout.pipe(logStream, { end: false });
+		// Access underlying socket's unref if available
+		(child.stdout as unknown as { unref?: () => void }).unref?.();
+	}
+	if (child.stderr) {
+		child.stderr.pipe(logStream, { end: false });
+		(child.stderr as unknown as { unref?: () => void }).unref?.();
+	}
+
+	// Unref everything so parent can exit
 	child.unref();
+	(logStream as unknown as { unref?: () => void }).unref?.();
 
 	// Save to process store
+	const walletName = getActiveWalletName() || "unknown";
 	const processState: ProcessState = {
 		name: processName,
 		pid: child.pid!,
 		strategy: strategyName,
 		account: accountName,
+		wallet: walletName,
 		config: innerConfig as Record<string, unknown>,
 		startedAt: Date.now(),
 		logFile,
@@ -338,12 +391,57 @@ Config: ${configPath || "default"}`,
 	store.processes.push(processState);
 	saveProcessStore(store);
 
+	// Wait briefly to catch immediate startup errors
+	await new Promise((resolve) => setTimeout(resolve, 1500));
+
+	// Check if process crashed immediately
+	if (spawnError) {
+		consola.error(`Failed to start process: ${(spawnError as Error).message}`);
+		// Remove from store since it failed
+		store.processes = store.processes.filter((p) => p.name !== processName);
+		saveProcessStore(store);
+		process.exit(1);
+	}
+
+	// Check if process is still running
+	if (!isProcessRunning(child.pid!)) {
+		console.log();
+		consola.error(
+			`Process '${processName}' exited immediately after starting.`,
+		);
+		consola.info(`Check logs for details: ${logFile}`);
+
+		// Show last few lines of log
+		try {
+			const logContent = fs.readFileSync(logFile, "utf8");
+			const lines = logContent.trim().split("\n").slice(-5);
+			if (lines.length > 0) {
+				console.log();
+				consola.info("Last log lines:");
+				for (const line of lines) {
+					console.log(dim(`  ${line}`));
+				}
+			}
+		} catch {
+			// Ignore log read errors
+		}
+
+		// Remove from store since it failed
+		store.processes = store.processes.filter((p) => p.name !== processName);
+		saveProcessStore(store);
+		console.log();
+		process.exit(1);
+	}
+
 	console.log();
 	consola.success(`Process '${processName}' started! (PID: ${child.pid})`);
 	console.log(dim(`  Logs: ${logFile}`));
 	console.log(dim("  Use 'deepdex pm ps' to view all processes."));
 	console.log(dim(`  Use 'deepdex pm stop ${processName}' to stop.`));
 	console.log();
+
+	// Force exit since Node may still have references
+	process.exit(0);
 }
 
 /**

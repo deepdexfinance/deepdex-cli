@@ -365,7 +365,9 @@ const COMMANDS: Record<string, CommandHelp> = {
 			"deepdex position close ETH-USDC --size 0.5",
 			"deepdex position close ETH-USDC --size 50%",
 		],
-		options: [{ flag: "--size", description: "Partial close size (number or %)" }],
+		options: [
+			{ flag: "--size", description: "Partial close size (number or %)" },
+		],
 	},
 	"position modify": {
 		description: "Modify take-profit and stop-loss levels",
@@ -393,11 +395,13 @@ const COMMANDS: Record<string, CommandHelp> = {
 		examples: [
 			"deepdex bot start",
 			"deepdex bot start grid --config ./grid.json",
+			"DEEPDEX_WALLET_PASSWORD=mypass deepdex bot start momentum --config ./config.json --yes",
 		],
 		options: [
 			{ flag: "--config", description: "Path to strategy config file" },
 			{ flag: "--account, -a", description: "Subaccount to use" },
 			{ flag: "--daemon", description: "Run in background" },
+			{ flag: "--password", description: "Wallet password (for automation)" },
 		],
 	},
 	config: {
@@ -460,10 +464,12 @@ const COMMANDS: Record<string, CommandHelp> = {
 		examples: [
 			"deepdex pm start eth-grid grid --config ./grid.json",
 			"deepdex pm start btc-dca simple --config ./dca.json --account trading",
+			"DEEPDEX_WALLET_PASSWORD=mypass deepdex pm start my-bot momentum --config ./config.json --yes",
 		],
 		options: [
 			{ flag: "--config", description: "Path to strategy config file" },
 			{ flag: "--account, -a", description: "Subaccount to use" },
+			{ flag: "--password", description: "Wallet password (for automation)" },
 		],
 	},
 	"pm stop": {
@@ -563,7 +569,12 @@ ${bold("GLOBAL OPTIONS")}
   --yes, -y         Skip confirmations
   --verbose, -v     Verbose output
   --dry-run         Simulate without executing
-  --help, -h        Show help`,
+  --password        Wallet password (for automation)
+  --help, -h        Show help
+
+${bold("ENVIRONMENT VARIABLES")}
+  DEEPDEX_WALLET_PASSWORD   Wallet password for non-interactive use
+  DEEPDEX_NON_INTERACTIVE   Set to "true" to fail instead of prompting`,
 		style: {
 			padding: 1,
 			borderColor: "magentaBright",

@@ -23,7 +23,7 @@ import {
 	formatSide,
 	truncateAddress,
 } from "../../utils/format.ts";
-import { confirm, promptPassword, table } from "../../utils/ui.ts";
+import { confirm, getPassword, table } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
 
@@ -368,7 +368,7 @@ function ensureWallet(): void {
 
 async function ensureUnlocked(): Promise<void> {
 	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
+		const password = await getPassword();
 		await unlockWallet(password);
 	}
 }

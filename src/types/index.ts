@@ -303,6 +303,7 @@ export interface ProcessState {
 	pid: number; // OS process ID
 	strategy: BotStrategy;
 	account: string;
+	wallet: string; // Wallet name used by this process
 	config: Record<string, unknown>;
 	startedAt: number;
 	logFile: string;

@@ -25,7 +25,7 @@ import {
 } from "../../services/wallet.ts";
 import { PRICE_DECIMALS } from "../../utils/constants.ts";
 import { dim, formatSide, formatToSize } from "../../utils/format.ts";
-import { confirm, promptPassword } from "../../utils/ui.ts";
+import { confirm, getPassword } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
 
@@ -94,10 +94,10 @@ async function executeSpotOrder(
 
 	// Handle percentage-based amount
 	let finalAmount: string;
-	let isPercentage = false;
+	let _isPercentage = false;
 
 	if (amountStr.endsWith("%")) {
-		isPercentage = true;
+		_isPercentage = true;
 		const percentage = Number.parseFloat(amountStr.slice(0, -1));
 		if (Number.isNaN(percentage) || percentage <= 0 || percentage > 100) {
 			throw new Error("Invalid percentage. Must be between 0 and 100.");
@@ -142,9 +142,7 @@ async function executeSpotOrder(
 			)?.price;
 
 			if (!oraclePrice) {
-				throw new Error(
-					`Could not determine price for ${baseToken.symbol}.`,
-				);
+				throw new Error(`Could not determine price for ${baseToken.symbol}.`);
 			}
 
 			const quoteToUse =
@@ -152,7 +150,9 @@ async function executeSpotOrder(
 			// Convert quote amount to base amount: quoteAmount / price
 			// quoteToUse is in quote decimals, oraclePrice is in PRICE_DECIMALS
 			const baseAmount =
-				(quoteToUse * 10n ** BigInt(baseToken.decimals) * 10n ** BigInt(PRICE_DECIMALS)) /
+				(quoteToUse *
+					10n ** BigInt(baseToken.decimals) *
+					10n ** BigInt(PRICE_DECIMALS)) /
 				(oraclePrice * 10n ** BigInt(quoteToken.decimals));
 
 			finalAmount = formatToSize(
@@ -268,8 +268,8 @@ Account: ${accountName}`,
 					side === "buy"
 						? amountBN.times(marketPrice).times(slippage.plus(1))
 						: amountBN
-							.times(marketPrice)
-							.times(new BigNumber(1).minus(slippage));
+								.times(marketPrice)
+								.times(new BigNumber(1).minus(slippage));
 
 				quoteAmount = parseUnits(
 					formatToSize(estimatedQuote, market.stepSize),
@@ -350,7 +350,7 @@ function ensureWallet(): void {
 
 async function ensureUnlocked(): Promise<void> {
 	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
+		const password = await getPassword();
 		await unlockWallet(password);
 	}
 }

@@ -176,6 +176,7 @@ const PARENT_COMMANDS = [
 	"order",
 	"position",
 	"bot",
+	"pm",
 	"config",
 	"history",
 ];
@@ -192,7 +193,18 @@ function isSubCommand(word: string): boolean {
  */
 function isSubCommandOf(parent: string, subCmd: string): boolean {
 	const subCommands: Record<string, string[]> = {
-		wallet: ["info", "export", "import", "sign"],
+		wallet: [
+			"info",
+			"export",
+			"import",
+			"sign",
+			"list",
+			"create",
+			"switch",
+			"rename",
+			"delete",
+			"transfer",
+		],
 		account: ["create", "list", "info", "deposit", "withdraw", "delegate"],
 		market: ["list", "info", "orderbook", "trades", "price", "funding"],
 		spot: ["buy", "sell"],
@@ -200,6 +212,7 @@ function isSubCommandOf(parent: string, subCmd: string): boolean {
 		order: ["list", "cancel", "cancel-all", "history"],
 		position: ["list", "info", "close", "modify"],
 		bot: ["start", "stop", "status", "logs", "list-strategies", "backtest"],
+		pm: ["ps", "start", "stop", "restart", "logs", "kill", "stop-all", "list"],
 		config: ["show", "set", "reset", "export", "import"],
 		history: ["trades", "transfers"],
 	};

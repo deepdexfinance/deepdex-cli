@@ -31,7 +31,7 @@ import {
 	formatSide,
 	formatToSize,
 } from "../../utils/format.ts";
-import { confirm, promptPassword } from "../../utils/ui.ts";
+import { confirm, getPassword } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
 
@@ -122,10 +122,10 @@ async function executePerpOrder(
 
 	// Handle percentage-based amount
 	let finalAmount: string;
-	let isPercentage = false;
+	let _isPercentage = false;
 
 	if (amountStr.endsWith("%")) {
-		isPercentage = true;
+		_isPercentage = true;
 		const percentage = Number.parseFloat(amountStr.slice(0, -1));
 		if (Number.isNaN(percentage) || percentage <= 0 || percentage > 100) {
 			throw new Error("Invalid percentage. Must be between 0 and 100.");
@@ -285,7 +285,7 @@ function ensureWallet(): void {
 
 async function ensureUnlocked(): Promise<void> {
 	if (!isUnlocked()) {
-		const password = await promptPassword("Enter wallet password: ");
+		const password = await getPassword();
 		await unlockWallet(password);
 	}
 }
