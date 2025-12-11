@@ -171,12 +171,32 @@ export async function cancel(args: ParsedArgs): Promise<void> {
 		const client = getPublicClient();
 		await client.waitForTransactionReceipt({ hash });
 
+		if (args.flags.json) {
+			console.log(
+				JSON.stringify(
+					{
+						success: true,
+						txHash: hash,
+						orderId,
+						status: "cancelled",
+					},
+					null,
+					2,
+				),
+			);
+			return;
+		}
+
 		console.log();
 		consola.success("Order cancelled");
 		const explorerUrl = `${network.explorer}/tx/${hash}`;
 		console.log(dim(`  Transaction: ${explorerUrl}`));
 		console.log();
 	} catch (error) {
+		if (args.flags.json) {
+			console.log(JSON.stringify({ error: (error as Error).message }, null, 2));
+			return;
+		}
 		consola.error(`Failed to cancel order: ${(error as Error).message}`);
 	}
 }

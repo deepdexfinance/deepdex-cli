@@ -158,10 +158,14 @@ setup_repo() {
     step "Setting up DeepDex CLI..."
     
     if [ -d "$INSTALL_DIR" ]; then
-        info "Existing installation found. Updating..."
+        info "Existing deepdex-cli installation found at $INSTALL_DIR. Updating..."
         cd "$INSTALL_DIR"
         if [ -d ".git" ]; then
             git pull --quiet origin main 2>/dev/null || warn "Could not update from git"
+        else
+            git clone --quiet --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>/dev/null || {
+                error "Failed to clone repository. Check your internet connection."
+            }
         fi
     else
         info "Cloning repository..."

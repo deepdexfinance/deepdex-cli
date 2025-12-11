@@ -455,20 +455,14 @@ function getTokenInfo(tokenSymbol: string): TokenInfo | null {
 		};
 	}
 
-	if (symbol === "USDC") {
-		return {
-			symbol: "USDC",
-			address: network.tokens.usdc.address as Address,
-			decimals: network.tokens.usdc.decimals,
-		};
-	}
-
-	if (symbol === "ETH") {
-		return {
-			symbol: "ETH",
-			address: network.tokens.eth.address as Address,
-			decimals: network.tokens.eth.decimals,
-		};
+	for (const token of Object.values(network.tokens)) {
+		if (token.symbol.toUpperCase() === symbol) {
+			return {
+				symbol: token.symbol,
+				address: token.address as Address,
+				decimals: token.decimals,
+			};
+		}
 	}
 
 	return null;
@@ -488,8 +482,11 @@ export async function transfer(args: ParsedArgs): Promise<void> {
 
 	const tokenInfo = getTokenInfo(tokenSymbol);
 	if (!tokenInfo) {
+		const supported = Object.values(network.tokens)
+			.map((t) => t.symbol)
+			.join(", ");
 		throw new Error(
-			`Unknown token: ${tokenSymbol}. Supported tokens: tDGAS, USDC, ETH`,
+			`Unknown token: ${tokenSymbol}. Supported tokens: ${supported}`,
 		);
 	}
 

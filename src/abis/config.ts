@@ -33,14 +33,14 @@ export const network = {
 			decimals: 18,
 			marketId: 2,
 		},
-		// sol: {
-		// 	name: "SOL",
-		// 	address: "0x8a77F53BCdC4780BE8C64F341913d552B13D32fA",
-		// 	icon: "/images/sol.png",
-		// 	symbol: "SOL",
-		// 	decimals: 9,
-		// 	marketId: 3,
-		// },
+		sol: {
+			name: "SOL",
+			address: "0x21Bbda69f5464d53e77206fDffAE560549414392",
+			icon: "/images/sol.png",
+			symbol: "SOL",
+			decimals: 9,
+			marketId: 3,
+		},
 	},
 };
 
@@ -58,21 +58,21 @@ export const spotPairs = [
 		leverage: 1,
 		tokens: [network.tokens.eth, network.tokens.usdc],
 	},
-	// {
-	// 	value: "SOL/USDC",
-	// 	label: "SOL/USDC",
-	// 	fee: "0.30%",
-	// 	pairId:
-	// 		"0x4e1af3b5045cc8c4feeb72e106dcb9dd2d2f0921111009fbb90d175057158932",
-	// 	price: "0",
-	// 	isPerp: false,
-	// 	disabled: false,
-	// 	leverage: 1,
-	// 	priceDecimal: 2,
-	// 	sizeOptions: [0.01, 0.1, 1, 10, 100],
-	// 	orderDecimal: 2,
-	// 	tokens: [network.tokens.sol, network.tokens.usdc],
-	// },
+	{
+		value: "SOL/USDC",
+		label: "SOL/USDC",
+		fee: "0.30%",
+		pairId:
+			"0x7eb581d73f79e10dc976bd3815f49ba4e0378a1aa8d64ece2aa3a807fbabc4d8",
+		price: "0",
+		isPerp: false,
+		disabled: false,
+		leverage: 1,
+		priceDecimal: 2,
+		sizeOptions: [0.01, 0.1, 1, 10, 100],
+		orderDecimal: 2,
+		tokens: [network.tokens.sol, network.tokens.usdc],
+	},
 ];
 
 export const perpPairs = [

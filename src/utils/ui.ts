@@ -57,10 +57,10 @@ export function table(
 	// Top border
 	lines.push(
 		SYMBOLS.corner.tl +
-		widths
-			.map((w) => SYMBOLS.border.h.repeat(w + 2))
-			.join(SYMBOLS.border.tee.t) +
-		SYMBOLS.corner.tr,
+			widths
+				.map((w) => SYMBOLS.border.h.repeat(w + 2))
+				.join(SYMBOLS.border.tee.t) +
+			SYMBOLS.corner.tr,
 	);
 
 	// Header row
@@ -69,17 +69,17 @@ export function table(
 	);
 	lines.push(
 		SYMBOLS.border.v +
-		headerCells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
-		SYMBOLS.border.v,
+			headerCells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
+			SYMBOLS.border.v,
 	);
 
 	// Header separator
 	lines.push(
 		SYMBOLS.border.tee.l +
-		widths
-			.map((w) => SYMBOLS.border.h.repeat(w + 2))
-			.join(SYMBOLS.border.cross) +
-		SYMBOLS.border.tee.r,
+			widths
+				.map((w) => SYMBOLS.border.h.repeat(w + 2))
+				.join(SYMBOLS.border.cross) +
+			SYMBOLS.border.tee.r,
 	);
 
 	// Data rows
@@ -89,18 +89,18 @@ export function table(
 		);
 		lines.push(
 			SYMBOLS.border.v +
-			cells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
-			SYMBOLS.border.v,
+				cells.map((c) => ` ${c} `).join(SYMBOLS.border.v) +
+				SYMBOLS.border.v,
 		);
 	}
 
 	// Bottom border
 	lines.push(
 		SYMBOLS.corner.bl +
-		widths
-			.map((w) => SYMBOLS.border.h.repeat(w + 2))
-			.join(SYMBOLS.border.tee.b) +
-		SYMBOLS.corner.br,
+			widths
+				.map((w) => SYMBOLS.border.h.repeat(w + 2))
+				.join(SYMBOLS.border.tee.b) +
+			SYMBOLS.corner.br,
 	);
 
 	return lines.join("\n");
@@ -143,14 +143,14 @@ export function box(title: string, content: string, width = 60): string {
 
 	lines.push(
 		borderColor +
-		SYMBOLS.corner.tl +
-		leftBorder +
-		reset +
-		bold(titlePadded) +
-		borderColor +
-		rightBorder +
-		SYMBOLS.corner.tr +
-		reset,
+			SYMBOLS.corner.tl +
+			leftBorder +
+			reset +
+			bold(titlePadded) +
+			borderColor +
+			rightBorder +
+			SYMBOLS.corner.tr +
+			reset,
 	);
 
 	// Content
@@ -166,10 +166,10 @@ export function box(title: string, content: string, width = 60): string {
 	// Bottom border
 	lines.push(
 		borderColor +
-		SYMBOLS.corner.bl +
-		SYMBOLS.border.h.repeat(innerWidth + 2) +
-		SYMBOLS.corner.br +
-		reset,
+			SYMBOLS.corner.bl +
+			SYMBOLS.border.h.repeat(innerWidth + 2) +
+			SYMBOLS.corner.br +
+			reset,
 	);
 
 	return lines.join("\n");
@@ -318,7 +318,7 @@ export async function getPassword(
 	if (isNonInteractive()) {
 		throw new Error(
 			`Password required but running in non-interactive mode. ` +
-			`Set ${envVarName} environment variable or provide --password flag.`,
+				`Set ${envVarName} environment variable or provide --password flag.`,
 		);
 	}
 
@@ -406,7 +406,7 @@ export async function getNewPassword(
 	if (isNonInteractive()) {
 		throw new Error(
 			`Password required for wallet creation but running in non-interactive mode. ` +
-			`Set ${envVarName} environment variable or provide --password flag.`,
+				`Set ${envVarName} environment variable or provide --password flag.`,
 		);
 	}
 

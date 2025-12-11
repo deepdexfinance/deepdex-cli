@@ -296,12 +296,33 @@ Size: ${size || "Full position"}`,
 		const client = getPublicClient();
 		await client.waitForTransactionReceipt({ hash });
 
+		if (args.flags.json) {
+			console.log(
+				JSON.stringify(
+					{
+						success: true,
+						txHash: hash,
+						market: market.value,
+						status: "closed",
+						size: size || "100%",
+					},
+					null,
+					2,
+				),
+			);
+			return;
+		}
+
 		console.log();
 		consola.success(`Position closed: ${market.value}`);
 		const explorerUrl = `${network.explorer}/tx/${hash}`;
 		console.log(dim(`  Transaction: ${explorerUrl}`));
 		console.log();
 	} catch (error) {
+		if (args.flags.json) {
+			console.log(JSON.stringify({ error: (error as Error).message }, null, 2));
+			return;
+		}
 		consola.error(`Failed to close position: ${(error as Error).message}`);
 	}
 }
@@ -372,12 +393,33 @@ ${sl ? `Stop Loss: $${sl}` : ""}`,
 		const client = getPublicClient();
 		await client.waitForTransactionReceipt({ hash });
 
+		if (args.flags.json) {
+			console.log(
+				JSON.stringify(
+					{
+						success: true,
+						txHash: hash,
+						market: market.value,
+						tp: tp || "unchanged",
+						sl: sl || "unchanged",
+					},
+					null,
+					2,
+				),
+			);
+			return;
+		}
+
 		console.log();
 		consola.success(`Position updated: ${market.value}`);
 		const explorerUrl = `${network.explorer}/tx/${hash}`;
 		console.log(dim(`  Transaction: ${explorerUrl}`));
 		console.log();
 	} catch (error) {
+		if (args.flags.json) {
+			console.log(JSON.stringify({ error: (error as Error).message }, null, 2));
+			return;
+		}
 		consola.error(`Failed to update position: ${(error as Error).message}`);
 	}
 }

@@ -240,7 +240,9 @@ export async function start(args: ParsedArgs): Promise<void> {
 
 	// Check for existing process
 	const store = syncProcessStatuses();
-	const existingProcess = store.processes.find((p: ProcessState) => p.name === processName);
+	const existingProcess = store.processes.find(
+		(p: ProcessState) => p.name === processName,
+	);
 	if (existingProcess) {
 		if (existingProcess.status === "running") {
 			throw new Error(
@@ -248,7 +250,9 @@ export async function start(args: ParsedArgs): Promise<void> {
 			);
 		}
 		// Remove stopped process so we can reuse the name
-		store.processes = store.processes.filter((p: ProcessState) => p.name !== processName);
+		store.processes = store.processes.filter(
+			(p: ProcessState) => p.name !== processName,
+		);
 	}
 
 	// Load config if specified
@@ -412,7 +416,9 @@ Config: ${configPath || "default"}`,
 	if (spawnError) {
 		consola.error(`Failed to start process: ${(spawnError as Error).message}`);
 		// Remove from store since it failed
-		store.processes = store.processes.filter((p: ProcessState) => p.name !== processName);
+		store.processes = store.processes.filter(
+			(p: ProcessState) => p.name !== processName,
+		);
 		saveProcessStore(store);
 		process.exit(1);
 	}
@@ -441,7 +447,9 @@ Config: ${configPath || "default"}`,
 		}
 
 		// Remove from store since it failed
-		store.processes = store.processes.filter((p: ProcessState) => p.name !== processName);
+		store.processes = store.processes.filter(
+			(p: ProcessState) => p.name !== processName,
+		);
 		saveProcessStore(store);
 		console.log();
 		process.exit(1);
@@ -475,18 +483,21 @@ export async function stop(args: ParsedArgs): Promise<void> {
 		throw new Error(`Process '${processName}' not found.`);
 	}
 
-	if (processState.status === "stopped" || !isProcessRunning(processState.pid)) {
+	if (
+		processState.status === "stopped" ||
+		!isProcessRunning(processState.pid)
+	) {
 		// Already stopped, just update status if needed
 		if (processState.status !== "stopped") {
 			processState.status = "stopped";
 			processState.stoppedAt = Date.now();
 			saveProcessStore(store);
 		}
-		consola.info(
-			`Process '${processName}' is already stopped.`,
-		);
+		consola.info(`Process '${processName}' is already stopped.`);
 		console.log(dim(`  Use 'deepdex pm restart ${processName}' to restart.`));
-		console.log(dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`));
+		console.log(
+			dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`),
+		);
 		return;
 	}
 
@@ -535,7 +546,9 @@ Uptime: ${formatDuration(Date.now() - processState.startedAt)}`,
 		console.log();
 		consola.success(`Process '${processName}' stopped.`);
 		console.log(dim(`  Use 'deepdex pm restart ${processName}' to restart.`));
-		console.log(dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`));
+		console.log(
+			dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`),
+		);
 	} catch (error) {
 		consola.error(`Failed to stop process: ${error}`);
 	}
@@ -661,7 +674,7 @@ export async function logs(args: ParsedArgs): Promise<void> {
 			});
 
 			// Keep process alive
-			await new Promise(() => { });
+			await new Promise(() => {});
 		}
 	} catch (error) {
 		consola.error(`Failed to read log file: ${error}`);
@@ -703,7 +716,9 @@ export async function kill(args: ParsedArgs): Promise<void> {
 		saveProcessStore(store);
 
 		consola.success(`Process '${processName}' killed.`);
-		console.log(dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`));
+		console.log(
+			dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`),
+		);
 	} catch (error) {
 		consola.error(`Failed to kill process: ${error}`);
 	}
@@ -718,7 +733,9 @@ export async function remove(args: ParsedArgs): Promise<void> {
 	const processName = optionalArg(args.positional, 0);
 
 	if (!processName) {
-		throw new Error("Process name is required. Usage: deepdex pm remove <name>");
+		throw new Error(
+			"Process name is required. Usage: deepdex pm remove <name>",
+		);
 	}
 
 	const store = getProcessStore();

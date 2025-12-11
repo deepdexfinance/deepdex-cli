@@ -258,6 +258,22 @@ Account: ${accountName}`,
 		const client = getPublicClient();
 		await client.waitForTransactionReceipt({ hash });
 
+		if (args.flags.json) {
+			const result = {
+				success: true,
+				txHash: hash,
+				pair: market.value,
+				side,
+				type: orderType,
+				amount: finalAmount,
+				price: finalPrice || "market",
+				leverage,
+				status: orderType === "market" ? "filled" : "open",
+			};
+			console.log(JSON.stringify(result, null, 2));
+			return;
+		}
+
 		console.log();
 		consola.success(`${side.toUpperCase()} position opened!`);
 		const explorerUrl = `${network.explorer}/tx/${hash}`;
@@ -269,6 +285,10 @@ Account: ${accountName}`,
 		console.log(dim("  View: deepdex position list"));
 		console.log();
 	} catch (error) {
+		if (args.flags.json) {
+			console.log(JSON.stringify({ error: (error as Error).message }, null, 2));
+			return;
+		}
 		consola.error(`Failed to open position: ${(error as Error).message}`);
 	}
 }

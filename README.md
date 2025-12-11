@@ -87,6 +87,40 @@ deepdex pm start my-bot momentum --config ./config.json --yes
 | `DEEPDEX_NEW_WALLET_PASSWORD` | Password for creating/importing wallets |
 | `DEEPDEX_NON_INTERACTIVE` | Set to "true" to fail instead of prompting |
 
+## 🧠 MCP Server
+
+The DeepDex CLI includes a built-in [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) server, enabling Large Language Models (LLMs) like Claude to interact directly with the DeepDex exchange.
+
+### Usage
+
+Start the MCP server to expose trading tools to your AI agent:
+
+```bash
+# Set wallet password for non-interactive access
+export DEEPDEX_WALLET_PASSWORD="your-wallet-password"
+
+# Start the server
+deepdex mcp
+```
+
+### Claude Desktop Configuration
+
+Add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "deepdex": {
+      "command": "deepdex",
+      "args": ["mcp"],
+      "env": {
+        "DEEPDEX_WALLET_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
 ## 🚀 Features
 
 - **Multi-Market Support**

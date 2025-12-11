@@ -313,11 +313,31 @@ Account: ${accountName}`,
 			}
 		}
 	} catch (error) {
+		if (args.flags.json) {
+			console.log(JSON.stringify({ error: (error as Error).message }, null, 2));
+			return;
+		}
 		consola.error(error);
 		return;
 	}
 
 	const orderId = txHash;
+
+	if (args.flags.json) {
+		const result = {
+			success: true,
+			txHash,
+			orderId,
+			pair: market.value,
+			side,
+			type: orderType,
+			amount: finalAmount,
+			price: finalPrice,
+			status: orderType === "market" ? "filled" : "open",
+		};
+		console.log(JSON.stringify(result, null, 2));
+		return;
+	}
 
 	console.log();
 	consola.success(

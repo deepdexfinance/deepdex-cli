@@ -13,6 +13,7 @@ import * as health from "./commands/health.ts";
 import * as history from "./commands/history.ts";
 import * as init from "./commands/init.ts";
 import * as market from "./commands/market.ts";
+import * as mcp from "./commands/mcp.ts";
 import * as order from "./commands/order.ts";
 import * as perp from "./commands/perp.ts";
 import * as pm from "./commands/pm.ts";
@@ -150,6 +151,11 @@ export async function route(args: ParsedArgs): Promise<void> {
 		// Health
 		case "health":
 			await health.run(args);
+			break;
+
+		// MCP Server
+		case "mcp":
+			await mcp.start(args);
 			break;
 
 		default:
