@@ -594,10 +594,13 @@ To:   ${truncateAddress(toAddress as Address)}`,
 
 	console.log();
 
-	const confirmed = await confirm("Confirm transfer?", true);
-	if (!confirmed) {
-		consola.info("Cancelled.");
-		return;
+	// Skip confirmation if --yes flag is passed
+	if (!args.flags.yes) {
+		const confirmed = await confirm("Confirm transfer?", true);
+		if (!confirmed) {
+			consola.info("Cancelled.");
+			return;
+		}
 	}
 
 	const password = await getPassword();
