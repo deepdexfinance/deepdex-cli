@@ -382,6 +382,32 @@ export async function startServer() {
 		},
 	);
 
+	// Tool: Guide
+	server.tool("guide", {}, async () => {
+		const guidePath = path.resolve(__dirname, "../../GUIDE.md");
+		try {
+			const text = await readFile(guidePath, "utf-8");
+			return {
+				content: [
+					{
+						type: "text",
+						text,
+					},
+				],
+			};
+		} catch (e) {
+			return {
+				content: [
+					{
+						type: "text",
+						text: `Error reading guide: ${(e as Error).message}`,
+					},
+				],
+				isError: true,
+			};
+		}
+	});
+
 	// Resource: GUIDE.md
 	server.registerResource(
 		"guide",
