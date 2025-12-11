@@ -306,7 +306,10 @@ export interface ProcessState {
 	wallet: string; // Wallet name used by this process
 	config: Record<string, unknown>;
 	startedAt: number;
+	stoppedAt?: number; // Timestamp when process was stopped
+	status: "running" | "stopped"; // Current status
 	logFile: string;
+	configPath?: string; // Path to config file if provided
 }
 
 export interface ProcessStore {

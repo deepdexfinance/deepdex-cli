@@ -82,14 +82,21 @@ function isProcessRunning(pid: number): boolean {
 }
 
 /**
- * Clean up stale processes from the store
+ * Update status of processes that are no longer running
  */
-function cleanupStaleProcesses(): ProcessStore {
+function syncProcessStatuses(): ProcessStore {
 	const store = getProcessStore();
-	const aliveProcesses = store.processes.filter((p) => isProcessRunning(p.pid));
+	let changed = false;
 
-	if (aliveProcesses.length !== store.processes.length) {
-		store.processes = aliveProcesses;
+	for (const p of store.processes) {
+		if (p.status === "running" && !isProcessRunning(p.pid)) {
+			p.status = "stopped";
+			p.stoppedAt = Date.now();
+			changed = true;
+		}
+	}
+
+	if (changed) {
 		saveProcessStore(store);
 	}
 
@@ -121,11 +128,11 @@ function validateProcessName(name: string): void {
  * Get all processes with their current status
  */
 function getProcessStatuses(): ProcessStatus[] {
-	const store = cleanupStaleProcesses();
+	const store = syncProcessStatuses();
 	return store.processes.map((p) => ({
 		...p,
-		running: isProcessRunning(p.pid),
-		uptime: Date.now() - p.startedAt,
+		running: p.status === "running" && isProcessRunning(p.pid),
+		uptime: p.status === "running" ? Date.now() - p.startedAt : undefined,
 	}));
 }
 
@@ -231,12 +238,17 @@ export async function start(args: ParsedArgs): Promise<void> {
 		);
 	}
 
-	// Check for duplicate name
-	const store = cleanupStaleProcesses();
-	if (store.processes.find((p) => p.name === processName)) {
-		throw new Error(
-			`Process '${processName}' already exists. Choose a different name.`,
-		);
+	// Check for existing process
+	const store = syncProcessStatuses();
+	const existingProcess = store.processes.find((p: ProcessState) => p.name === processName);
+	if (existingProcess) {
+		if (existingProcess.status === "running") {
+			throw new Error(
+				`Process '${processName}' is already running. Stop it first or choose a different name.`,
+			);
+		}
+		// Remove stopped process so we can reuse the name
+		store.processes = store.processes.filter((p: ProcessState) => p.name !== processName);
 	}
 
 	// Load config if specified
@@ -385,7 +397,9 @@ Config: ${configPath || "default"}`,
 		wallet: walletName,
 		config: innerConfig as Record<string, unknown>,
 		startedAt: Date.now(),
+		status: "running",
 		logFile,
+		configPath: configPath || undefined,
 	};
 
 	store.processes.push(processState);
@@ -398,7 +412,7 @@ Config: ${configPath || "default"}`,
 	if (spawnError) {
 		consola.error(`Failed to start process: ${(spawnError as Error).message}`);
 		// Remove from store since it failed
-		store.processes = store.processes.filter((p) => p.name !== processName);
+		store.processes = store.processes.filter((p: ProcessState) => p.name !== processName);
 		saveProcessStore(store);
 		process.exit(1);
 	}
@@ -427,7 +441,7 @@ Config: ${configPath || "default"}`,
 		}
 
 		// Remove from store since it failed
-		store.processes = store.processes.filter((p) => p.name !== processName);
+		store.processes = store.processes.filter((p: ProcessState) => p.name !== processName);
 		saveProcessStore(store);
 		console.log();
 		process.exit(1);
@@ -461,13 +475,18 @@ export async function stop(args: ParsedArgs): Promise<void> {
 		throw new Error(`Process '${processName}' not found.`);
 	}
 
-	if (!isProcessRunning(processState.pid)) {
-		// Remove from store since it's already dead
-		store.processes = store.processes.filter((p) => p.name !== processName);
-		saveProcessStore(store);
+	if (processState.status === "stopped" || !isProcessRunning(processState.pid)) {
+		// Already stopped, just update status if needed
+		if (processState.status !== "stopped") {
+			processState.status = "stopped";
+			processState.stoppedAt = Date.now();
+			saveProcessStore(store);
+		}
 		consola.info(
-			`Process '${processName}' was already stopped. Removed from list.`,
+			`Process '${processName}' is already stopped.`,
 		);
+		console.log(dim(`  Use 'deepdex pm restart ${processName}' to restart.`));
+		console.log(dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`));
 		return;
 	}
 
@@ -508,12 +527,15 @@ Uptime: ${formatDuration(Date.now() - processState.startedAt)}`,
 			process.kill(processState.pid, "SIGKILL");
 		}
 
-		// Remove from store
-		store.processes = store.processes.filter((p) => p.name !== processName);
+		// Mark as stopped instead of removing
+		processState.status = "stopped";
+		processState.stoppedAt = Date.now();
 		saveProcessStore(store);
 
 		console.log();
 		consola.success(`Process '${processName}' stopped.`);
+		console.log(dim(`  Use 'deepdex pm restart ${processName}' to restart.`));
+		console.log(dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`));
 	} catch (error) {
 		consola.error(`Failed to stop process: ${error}`);
 	}
@@ -550,18 +572,23 @@ export async function restart(args: ParsedArgs): Promise<void> {
 		flags: { ...args.flags, yes: true },
 	};
 	await stop(stopArgs);
-
 	// Small delay before restart
 	await new Promise((resolve) => setTimeout(resolve, 500));
 
 	// Start with same config
+	const startRaw: Record<string, string | number | boolean> = {
+		...args.raw,
+		account: processState.account,
+	};
+
+	if (processState.configPath) {
+		startRaw.config = processState.configPath;
+	}
+
 	const startArgs = {
 		...args,
 		positional: [processName, processState.strategy],
-		raw: {
-			...args.raw,
-			account: processState.account,
-		},
+		raw: startRaw,
 		flags: { ...args.flags, yes: true },
 	};
 
@@ -634,7 +661,7 @@ export async function logs(args: ParsedArgs): Promise<void> {
 			});
 
 			// Keep process alive
-			await new Promise(() => {});
+			await new Promise(() => { });
 		}
 	} catch (error) {
 		consola.error(`Failed to read log file: ${error}`);
@@ -670,11 +697,13 @@ export async function kill(args: ParsedArgs): Promise<void> {
 			process.kill(processState.pid, "SIGKILL");
 		}
 
-		// Remove from store
-		store.processes = store.processes.filter((p) => p.name !== processName);
+		// Mark as stopped (killed)
+		processState.status = "stopped";
+		processState.stoppedAt = Date.now();
 		saveProcessStore(store);
 
 		consola.success(`Process '${processName}' killed.`);
+		console.log(dim(`  Use 'deepdex pm remove ${processName}' to remove from list.`));
 	} catch (error) {
 		consola.error(`Failed to kill process: ${error}`);
 	}
@@ -683,10 +712,42 @@ export async function kill(args: ParsedArgs): Promise<void> {
 }
 
 /**
+ * Remove a process from the list
+ */
+export async function remove(args: ParsedArgs): Promise<void> {
+	const processName = optionalArg(args.positional, 0);
+
+	if (!processName) {
+		throw new Error("Process name is required. Usage: deepdex pm remove <name>");
+	}
+
+	const store = getProcessStore();
+	const processState = store.processes.find((p) => p.name === processName);
+
+	if (!processState) {
+		throw new Error(`Process '${processName}' not found.`);
+	}
+
+	if (processState.status === "running" && isProcessRunning(processState.pid)) {
+		throw new Error(
+			`Process '${processName}' is running. Stop it first: deepdex pm stop ${processName}`,
+		);
+	}
+
+	// Remove from store
+	store.processes = store.processes.filter((p) => p.name !== processName);
+	saveProcessStore(store);
+
+	console.log();
+	consola.success(`Process '${processName}' removed.`);
+	console.log();
+}
+
+/**
  * Stop all processes
  */
 export async function stopAll(args: ParsedArgs): Promise<void> {
-	const store = cleanupStaleProcesses();
+	const store = syncProcessStatuses();
 
 	if (store.processes.length === 0) {
 		consola.info("No processes running.");
@@ -718,20 +779,24 @@ export async function stopAll(args: ParsedArgs): Promise<void> {
 		try {
 			if (isProcessRunning(processState.pid)) {
 				process.kill(processState.pid, "SIGTERM");
-				consola.success(
-					`Stopped '${processState.name}' (PID: ${processState.pid})`,
-				);
 			}
+
+			processState.status = "stopped";
+			processState.stoppedAt = Date.now();
+
+			consola.success(
+				`Stopped '${processState.name}' (PID: ${processState.pid})`,
+			);
 		} catch {
 			consola.warn(`Failed to stop '${processState.name}'`);
 		}
 	}
 
-	// Clear the store
-	store.processes = [];
+	// Save updates
 	saveProcessStore(store);
 
 	console.log();
 	consola.success("All processes stopped.");
+	console.log(dim("  Use 'deepdex pm ps' to view stopped processes."));
 	console.log();
 }
