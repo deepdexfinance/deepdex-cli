@@ -5,7 +5,7 @@ set -euo pipefail
 # ║                         DeepDex CLI Installer                            ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-REPO_URL="https://github.com/deepdex/deepdex.git"
+REPO_URL="https://github.com/deepdexfinance/deepdex-cli.git"
 INSTALL_DIR="${DEEPDEX_INSTALL_DIR:-$HOME/.deepdex}"
 BIN_DIR="${DEEPDEX_BIN_DIR:-$HOME/.local/bin}"
 
@@ -278,7 +278,7 @@ print_success() {
     echo -e "    ${YELLOW}deepdex market list${NC}   View available markets"
     echo ""
     echo -e "  ${BOLD}Documentation:${NC}"
-    echo -e "    ${BLUE}https://github.com/deepdex/deepdex${NC}"
+    echo -e "    ${BLUE}https://github.com/deepdexfinance/deepdex-cli${NC}"
     echo ""
 }
 

@@ -9,13 +9,13 @@ A high-performance CLI trading bot and utility suite for the DeepDex protocol. T
 ### Quick Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/deepdexfinance/deepdex-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/deepdexfinance/deepdex-cli/refs/heads/main/install.sh | bash
 ```
 
 Or with wget:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/deepdexfinance/deepdex-cli/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/deepdexfinance/deepdex-cli/refs/heads/main/install.sh | bash
 ```
 
 ### Manual Install
