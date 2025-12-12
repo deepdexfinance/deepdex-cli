@@ -7,10 +7,12 @@ import type { Address } from "viem";
 import { network } from "../../abis/config.ts";
 import {
 	getBalance,
+	getOraclePrices,
 	getSubaccounts,
 	getTokenBalance,
 } from "../../services/client.ts";
 import { getStoredAddress, walletExists } from "../../services/wallet.ts";
+import { PRICE_DECIMALS } from "../../utils/constants.ts";
 import {
 	dim,
 	formatAmount,
@@ -34,28 +36,57 @@ export async function run(args: ParsedArgs): Promise<void> {
 
 	consola.start("Fetching balances...");
 
+	// Fetch oracle prices
+	let oraclePrices: { symbol: string; price: bigint }[] = [];
+	try {
+		oraclePrices = await getOraclePrices();
+	} catch {
+		// Ignore errors
+	}
+
 	// Get tDGAS balance
-	const ethBalance = await getBalance(address as Address);
+	const gasBalance = await getBalance(address as Address);
+	// For now, we don't have a price for tDGAS
+	const gasUsd = 0n;
 
 	// Get token balances
-	const tokenBalances: { symbol: string; balance: bigint; decimals: number }[] =
-		[];
+	const tokenBalances: {
+		symbol: string;
+		balance: bigint;
+		decimals: number;
+		usdValue: bigint;
+	}[] = [];
 	for (const token of Object.values(network.tokens)) {
+		if (token.symbol === "tDGAS") continue;
 		try {
 			const balance = await getTokenBalance(
 				address as Address,
 				token.address as Address,
 			);
+
+			const price = oraclePrices.find(
+				(p) => p.symbol.toUpperCase() === token.symbol.toUpperCase(),
+			);
+
+			// Price is in 6 decimals
+			// USD Value = (Balance * Price) / 10^TokenDecimals
+			// This results in USD Value with 6 decimals (same as Price)
+			const usdValue = price
+				? (balance * price.price) / 10n ** BigInt(token.decimals)
+				: 0n;
+
 			tokenBalances.push({
 				symbol: token.symbol,
 				balance,
 				decimals: token.decimals,
+				usdValue: token.symbol === "USDC" ? balance : usdValue,
 			});
 		} catch {
 			tokenBalances.push({
 				symbol: token.symbol,
 				balance: 0n,
 				decimals: token.decimals,
+				usdValue: 0n,
 			});
 		}
 	}
@@ -65,10 +96,14 @@ export async function run(args: ParsedArgs): Promise<void> {
 			JSON.stringify(
 				{
 					wallet: address,
-					tDGAS: ethBalance.toString(),
+					tDGAS: {
+						balance: gasBalance.toString(),
+						usd: gasUsd.toString(),
+					},
 					tokens: tokenBalances.map((t) => ({
 						symbol: t.symbol,
 						balance: t.balance.toString(),
+						usd: t.usdValue.toString(),
 					})),
 				},
 				null,
@@ -95,13 +130,13 @@ export async function run(args: ParsedArgs): Promise<void> {
 	const walletData = [
 		{
 			Token: "tDGAS",
-			Balance: formatAmount(ethBalance, 18, 6),
-			USD: "-",
+			Balance: formatAmount(gasBalance, 18, 6),
+			USD: gasUsd ? formatUSD(gasUsd, PRICE_DECIMALS) : "-",
 		},
 		...tokenBalances.map((t) => ({
 			Token: t.symbol,
 			Balance: formatAmount(t.balance, t.decimals, 4),
-			USD: t.symbol === "USDC" ? formatUSD(t.balance, t.decimals) : "-",
+			USD: t.usdValue > 0n ? formatUSD(t.usdValue, PRICE_DECIMALS) : "-",
 		})),
 	];
 

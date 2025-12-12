@@ -16,7 +16,56 @@ const execAsync = promisify(exec);
 const CLI_PATH = path.resolve(__dirname, "../../index.ts");
 const BUN_CMD = "bun";
 
-// Helper to run CLI command
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Create a successful tool result with JSON content
+ */
+function successResult(data: unknown) {
+	return {
+		content: [
+			{
+				type: "text" as const,
+				text: JSON.stringify(data, null, 2),
+			},
+		],
+	};
+}
+
+/**
+ * Create a successful tool result with plain text content
+ */
+function textResult(text: string) {
+	return {
+		content: [
+			{
+				type: "text" as const,
+				text,
+			},
+		],
+	};
+}
+
+/**
+ * Create an error tool result
+ */
+function errorResult(message: string) {
+	return {
+		content: [
+			{
+				type: "text" as const,
+				text: message,
+			},
+		],
+		isError: true,
+	};
+}
+
+/**
+ * Run a CLI command and return parsed JSON result
+ */
 async function runCli(args: string[]): Promise<unknown> {
 	const command = `${BUN_CMD} ${CLI_PATH} ${args.join(" ")} --json`;
 
@@ -53,210 +102,189 @@ async function runCli(args: string[]): Promise<unknown> {
 		try {
 			return JSON.parse(jsonStr);
 		} catch (_e) {
-			console.error("Failed to parse JSON:", jsonStr);
-			// If parsing fails, return raw text or throw
+			// If parsing fails, throw with raw output
 			throw new Error(`Invalid JSON output from CLI: ${output}`);
 		}
 	} catch (error) {
 		const err = error as Error & { stderr?: string };
 		throw new Error(
-			`CLI execution failed: ${err.message}\nStderr: ${err.stderr || ""}`,
+			`CLI execution failed: ${err.message}${err.stderr ? `\nStderr: ${err.stderr}` : ""}`,
 		);
 	}
 }
 
-// Start server
-export async function startServer() {
-	// Create MCP server
-	const server = new McpServer({
-		name: "deepdex-trader",
-		version: "1.0.0",
-	});
+/**
+ * Execute a CLI command and return a tool result
+ * Handles errors automatically
+ */
+async function executeCliTool(args: string[]) {
+	try {
+		const result = await runCli(args);
+		return successResult(result);
+	} catch (e) {
+		return errorResult(`Error: ${(e as Error).message}`);
+	}
+}
 
-	// Tool: Check connection
-	server.tool("check_status", {}, async () => {
-		try {
-			const result = await runCli(["health"]);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
-		} catch (e) {
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Error checking status: ${(e as Error).message}`,
-					},
-				],
-				isError: true,
-			};
-		}
-	});
+// ============================================================================
+// Tool Definitions
+// ============================================================================
 
-	// Tool: List Markets
-	server.tool("list_markets", {}, async () => {
-		const result = await runCli(["market", "list"]);
-		return {
-			content: [
-				{
-					type: "text",
-					text: JSON.stringify(result, null, 2),
-				},
-			],
-		};
-	});
+/**
+ * Register all tools on the MCP server
+ */
+function registerTools(server: McpServer) {
+	// -------------------------------------------------------------------------
+	// Status & Information Tools
+	// -------------------------------------------------------------------------
 
-	// Tool: Get Market Price
+	server.tool(
+		"check_status",
+		"Check the connection status of the DeepDex CLI",
+		{},
+		async () => executeCliTool(["health"]),
+	);
+
+	server.tool(
+		"guide",
+		"Read the DeepDex user guide for documentation and usage instructions",
+		{},
+		async () => {
+			const guidePath = path.resolve(__dirname, "../../GUIDE.md");
+			try {
+				const text = await readFile(guidePath, "utf-8");
+				return textResult(text);
+			} catch (e) {
+				return errorResult(`Error reading guide: ${(e as Error).message}`);
+			}
+		},
+	);
+
+	// -------------------------------------------------------------------------
+	// Market Tools
+	// -------------------------------------------------------------------------
+
+	server.tool(
+		"list_markets",
+		"List all available trading markets",
+		{},
+		async () => executeCliTool(["market", "list"]),
+	);
+
 	server.tool(
 		"get_market_price",
+		"Get the current price of a specific market pair",
 		{
-			pair: z.string(),
+			pair: z.string().describe("Market pair (e.g. BTC-PERP, ETH-PERP)"),
 		},
-		async ({ pair }) => {
-			const result = await runCli(["market", "price", pair]);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
-		},
+		async ({ pair }) => executeCliTool(["market", "price", pair]),
 	);
 
-	// Tool: List Subaccounts
-	server.tool("list_subaccounts", {}, async () => {
-		const result = await runCli(["account", "list"]);
-		return {
-			content: [
-				{
-					type: "text",
-					text: JSON.stringify(result, null, 2),
-				},
-			],
-		};
-	});
+	// -------------------------------------------------------------------------
+	// Subaccount Tools
+	// -------------------------------------------------------------------------
 
-	// Tool: Create Subaccount
+	server.tool(
+		"list_subaccounts",
+		"List all subaccounts associated with the wallet",
+		{},
+		async () => executeCliTool(["account", "list"]),
+	);
+
 	server.tool(
 		"create_subaccount",
+		"Create a new subaccount with the specified name",
 		{
-			name: z.string(),
+			name: z.string().describe("Name of the new subaccount"),
 		},
-		async ({ name }) => {
-			// Note: create usually requires confirmation, so we use --yes implied by NON_INTERACTIVE or explicit flag if supported
-			// The parser usually supports --yes
-			const result = await runCli(["account", "create", name, "--yes"]);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
-		},
+		async ({ name }) => executeCliTool(["account", "create", name, "--yes"]),
 	);
 
-	// Tool: Deposit
+	// -------------------------------------------------------------------------
+	// Deposit & Withdraw Tools
+	// -------------------------------------------------------------------------
+
 	server.tool(
 		"deposit",
+		"Deposit tokens into a subaccount",
 		{
-			amount: z.string().describe("Amount (e.g. '100', '50%')"),
+			amount: z
+				.string()
+				.describe("Amount to deposit (e.g. '100', '50%' for percentage)"),
 			token: z.string().describe("Token symbol (e.g. 'USDC')"),
-			account: z.string().describe("Subaccount name").optional(),
+			account: z.string().optional().describe("Subaccount name (optional)"),
 		},
 		async ({ amount, token, account }) => {
 			const args = ["account", "deposit", amount, token, "--yes"];
-			if (account) {
-				args.push("--account", account);
-			}
-			const result = await runCli(args);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
+			if (account) args.push("--account", account);
+			return executeCliTool(args);
 		},
 	);
 
-	// Tool: Withdraw
 	server.tool(
 		"withdraw",
+		"Withdraw tokens from a subaccount",
 		{
-			amount: z.string(),
-			token: z.string(),
-			account: z.string().optional(),
+			amount: z
+				.string()
+				.describe("Amount to withdraw (e.g. '100', '50%' for percentage)"),
+			token: z.string().describe("Token symbol (e.g. 'USDC')"),
+			account: z.string().optional().describe("Subaccount name (optional)"),
 		},
 		async ({ amount, token, account }) => {
 			const args = ["account", "withdraw", amount, token, "--yes"];
-			if (account) {
-				args.push("--account", account);
-			}
-			const result = await runCli(args);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
+			if (account) args.push("--account", account);
+			return executeCliTool(args);
 		},
 	);
 
-	// Tool: Place Spot Order
+	// -------------------------------------------------------------------------
+	// Spot Trading Tools
+	// -------------------------------------------------------------------------
+
 	server.tool(
 		"place_spot_order",
+		"Place a limit or market order on the spot market",
 		{
-			side: z.enum(["buy", "sell"]),
-			pair: z.string(),
-			amount: z.string(),
-			price: z.string().optional(),
-			account: z.string().optional(),
+			side: z.enum(["buy", "sell"]).describe("Order side (buy or sell)"),
+			pair: z.string().describe("Market pair (e.g. BTC-USDC, ETH-USDC)"),
+			amount: z.string().describe("Amount to trade"),
+			price: z
+				.string()
+				.optional()
+				.describe("Limit price (omit for market order)"),
+			account: z.string().optional().describe("Subaccount name (optional)"),
 		},
 		async ({ side, pair, amount, price, account }) => {
 			const args = ["spot", side, pair, amount, "--yes"];
-			if (price) {
-				args.push("--price", price);
-			}
-			if (account) {
-				args.push("--account", account);
-			}
-
-			const result = await runCli(args);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
+			if (price) args.push("--price", price);
+			if (account) args.push("--account", account);
+			return executeCliTool(args);
 		},
 	);
 
-	// Tool: Place Perp Order
+	// -------------------------------------------------------------------------
+	// Perpetual Trading Tools
+	// -------------------------------------------------------------------------
+
 	server.tool(
 		"place_perp_order",
+		"Place a long or short order on the perpetual market",
 		{
-			side: z.enum(["long", "short"]),
-			pair: z.string(),
-			amount: z.string(),
-			leverage: z.number().default(1),
-			price: z.string().optional(),
-			takeProfit: z.string().optional(),
-			stopLoss: z.string().optional(),
-			account: z.string().optional(),
+			side: z.enum(["long", "short"]).describe("Order side (long or short)"),
+			pair: z.string().describe("Market pair (e.g. BTC-PERP, ETH-PERP)"),
+			amount: z.string().describe("Amount to trade in USD value"),
+			leverage: z
+				.number()
+				.default(1)
+				.describe("Leverage multiplier (default: 1)"),
+			price: z
+				.string()
+				.optional()
+				.describe("Limit price (omit for market order)"),
+			takeProfit: z.string().optional().describe("Take profit price"),
+			stopLoss: z.string().optional().describe("Stop loss price"),
+			account: z.string().optional().describe("Subaccount name (optional)"),
 		},
 		async ({
 			side,
@@ -277,142 +305,89 @@ export async function startServer() {
 				leverage.toString(),
 				"--yes",
 			];
-			if (price) {
-				args.push("--price", price);
-			}
-			if (takeProfit) {
-				args.push("--tp", takeProfit);
-			}
-			if (stopLoss) {
-				args.push("--sl", stopLoss);
-			}
-			if (account) {
-				args.push("--account", account);
-			}
-
-			const result = await runCli(args);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
+			if (price) args.push("--price", price);
+			if (takeProfit) args.push("--tp", takeProfit);
+			if (stopLoss) args.push("--sl", stopLoss);
+			if (account) args.push("--account", account);
+			return executeCliTool(args);
 		},
 	);
 
-	// Tool: List Orders
+	// -------------------------------------------------------------------------
+	// Order Management Tools
+	// -------------------------------------------------------------------------
+
 	server.tool(
 		"list_orders",
+		"List open orders",
 		{
-			account: z.string().optional(),
-			market: z.string().optional(),
+			account: z.string().optional().describe("Subaccount name (optional)"),
+			market: z.string().optional().describe("Filter by market (optional)"),
 		},
 		async ({ account, market }) => {
 			const args = ["order", "list"];
 			if (account) args.push("--account", account);
 			if (market) args.push("--market", market);
-
-			const result = await runCli(args);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
+			return executeCliTool(args);
 		},
 	);
 
-	// Tool: Cancel Order
 	server.tool(
 		"cancel_order",
+		"Cancel an existing order by its ID",
 		{
-			orderId: z.string(), // CLI takes string or number? usually CLI args are strings
+			orderId: z.string().describe("ID of the order to cancel"),
 		},
-		async ({ orderId }) => {
-			const result = await runCli(["order", "cancel", orderId, "--yes"]);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
-		},
+		async ({ orderId }) =>
+			executeCliTool(["order", "cancel", orderId, "--yes"]),
 	);
 
-	// Tool: List Positions
-	server.tool("list_positions", {}, async () => {
-		const result = await runCli(["position", "list"]);
-		return {
-			content: [
-				{
-					type: "text",
-					text: JSON.stringify(result, null, 2),
-				},
-			],
-		};
-	});
+	// -------------------------------------------------------------------------
+	// Position Management Tools
+	// -------------------------------------------------------------------------
 
-	// Tool: Close Position
+	server.tool(
+		"list_positions",
+		"List all current open positions",
+		{},
+		async () => executeCliTool(["position", "list"]),
+	);
+
 	server.tool(
 		"close_position",
+		"Close an open position partially or fully",
 		{
-			market: z.string(),
-			size: z.string().optional().describe("Size to close (e.g. '50%', '0.1')"),
+			market: z.string().describe("Market symbol (e.g. BTC-PERP)"),
+			size: z
+				.string()
+				.optional()
+				.describe(
+					"Size to close (e.g. '50%', '0.1'). Omit to close entire position",
+				),
 		},
 		async ({ market, size }) => {
 			const args = ["position", "close", market, "--yes"];
-			if (size) {
-				args.push("--size", size);
-			}
-			const result = await runCli(args);
-			return {
-				content: [
-					{
-						type: "text",
-						text: JSON.stringify(result, null, 2),
-					},
-				],
-			};
+			if (size) args.push("--size", size);
+			return executeCliTool(args);
 		},
 	);
+}
 
-	// Tool: Guide
-	server.tool("guide", {}, async () => {
-		const guidePath = path.resolve(__dirname, "../../GUIDE.md");
-		try {
-			const text = await readFile(guidePath, "utf-8");
-			return {
-				content: [
-					{
-						type: "text",
-						text,
-					},
-				],
-			};
-		} catch (e) {
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Error reading guide: ${(e as Error).message}`,
-					},
-				],
-				isError: true,
-			};
-		}
-	});
+// ============================================================================
+// Resource Definitions
+// ============================================================================
 
-	// Resource: GUIDE.md
-	server.registerResource(
+/**
+ * Register all resources on the MCP server
+ */
+function registerResources(server: McpServer) {
+	server.resource(
 		"guide",
 		"deepdex://guide",
-		{ mimeType: "text/markdown" },
+		{
+			description: "DeepDex user guide and documentation",
+			mimeType: "text/markdown",
+		},
 		async (uri) => {
 			const guidePath = path.resolve(__dirname, "../../GUIDE.md");
 			try {
@@ -431,6 +406,26 @@ export async function startServer() {
 			}
 		},
 	);
+}
+
+// ============================================================================
+// Server Entry Point
+// ============================================================================
+
+/**
+ * Start the MCP server
+ */
+export async function startServer() {
+	const server = new McpServer({
+		name: "deepdex-trader",
+		version: "1.0.0",
+	});
+
+	// Register all tools and resources
+	registerTools(server);
+	registerResources(server);
+
+	// Connect via stdio transport
 	const transport = new StdioServerTransport();
 	await server.connect(transport);
 }

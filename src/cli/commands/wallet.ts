@@ -42,6 +42,7 @@ import {
 	getPassword,
 	keyValue,
 	prompt,
+	selectWithArrows,
 } from "../../utils/ui.ts";
 import type { ParsedArgs } from "../parser.ts";
 import { getFlag, requireArg } from "../parser.ts";
@@ -149,7 +150,8 @@ export async function list(args: ParsedArgs): Promise<void> {
 	console.log();
 
 	for (const wallet of wallets) {
-		const marker = wallet.isActive ? "→ " : "  ";
+		// Use elegant cyan pointer for active wallet
+		const marker = wallet.isActive ? "\x1b[36m❯\x1b[0m " : "  ";
 		const activeLabel = wallet.isActive ? dim(" (active)") : "";
 		console.log(
 			`${marker}${wallet.name}${activeLabel}\n    ${dim(wallet.address)}`,
@@ -210,18 +212,61 @@ export async function create(args: ParsedArgs): Promise<void> {
 
 /**
  * Switch active wallet
+ * If no wallet name is provided, shows an interactive selector with arrow key navigation
  */
 export async function switchCmd(args: ParsedArgs): Promise<void> {
-	const name = requireArg(args.positional, 0, "wallet_name");
+	const wallets = getAllWallets();
 
-	if (!walletNameExists(name)) {
-		throw new Error(
-			`Wallet "${name}" not found. Use 'deepdex wallet list' to see available wallets.`,
+	if (wallets.length === 0) {
+		throw new Error("No wallets found. Run 'deepdex init' to create one.");
+	}
+
+	if (wallets.length === 1) {
+		consola.info(`Only one wallet exists: ${wallets[0]!.name}`);
+		return;
+	}
+
+	let walletName: string;
+
+	// If name provided as argument, use it
+	if (args.positional[0]) {
+		walletName = args.positional[0];
+	} else {
+		// Show interactive selector
+		const activeWalletName = getActiveWalletName();
+		const activeIndex = wallets.findIndex((w) => w.name === activeWalletName);
+
+		console.log();
+		consola.info(dim("Use ↑/↓ arrows to navigate, Enter to select"));
+		console.log();
+
+		walletName = await selectWithArrows(
+			"Select wallet:",
+			wallets.map((w) => ({
+				value: w.name,
+				label: w.name,
+				hint: w.isActive
+					? "(active)"
+					: truncateAddress(w.address as `0x${string}`),
+			})),
+			activeIndex >= 0 ? activeIndex : 0,
 		);
 	}
 
-	switchWallet(name);
-	consola.success(`Switched to wallet: ${name}`);
+	if (!walletNameExists(walletName)) {
+		throw new Error(
+			`Wallet "${walletName}" not found. Use 'deepdex wallet list' to see available wallets.`,
+		);
+	}
+
+	// Check if already active
+	if (walletName === getActiveWalletName()) {
+		consola.info(`Wallet "${walletName}" is already active.`);
+		return;
+	}
+
+	switchWallet(walletName);
+	consola.success(`Switched to wallet: ${walletName}`);
 }
 
 /**

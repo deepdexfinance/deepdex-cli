@@ -447,6 +447,122 @@ export async function select(
 }
 
 /**
+ * Show an interactive selection menu with arrow key navigation
+ * Use up/down arrows to navigate, Enter to select
+ */
+export async function selectWithArrows(
+	message: string,
+	options: { value: string; label: string; hint?: string }[],
+	initialIndex = 0,
+): Promise<string> {
+	if (options.length === 0) {
+		throw new Error("No options provided for selection");
+	}
+
+	// Check if we're in a TTY (interactive terminal)
+	if (!process.stdin.isTTY) {
+		// Fall back to numbered selection for non-TTY
+		return select(message, options);
+	}
+
+	return new Promise((resolve, reject) => {
+		let selectedIndex = Math.min(Math.max(0, initialIndex), options.length - 1);
+
+		const renderOptions = () => {
+			// Move cursor up to overwrite previous options (except first render)
+			// Move up by number of options + 1 (for the message line)
+			process.stdout.moveCursor?.(0, -(options.length + 1));
+
+			// Print message
+			console.log(message);
+
+			// Print options
+			for (let i = 0; i < options.length; i++) {
+				const opt = options[i]!;
+				const isSelected = i === selectedIndex;
+				// Use elegant cyan pointer for selection
+				const pointer = isSelected ? "\x1b[36m❯\x1b[0m" : " ";
+				const highlight = isSelected ? bold : (s: string) => s;
+				const hintText = opt.hint ? dim(` ${opt.hint}`) : "";
+
+				// Clear the current line before writing
+				process.stdout.clearLine?.(0);
+
+				console.log(`  ${pointer} ${highlight(opt.label)}${hintText}`);
+			}
+		};
+
+		// Initial render
+		console.log(message);
+		for (let i = 0; i < options.length; i++) {
+			const opt = options[i]!;
+			const isSelected = i === selectedIndex;
+			// Use elegant cyan pointer for selection
+			const pointer = isSelected ? "\x1b[36m❯\x1b[0m" : " ";
+			const highlight = isSelected ? bold : (s: string) => s;
+			const hintText = opt.hint ? dim(` ${opt.hint}`) : "";
+			console.log(`  ${pointer} ${highlight(opt.label)}${hintText}`);
+		}
+
+		// Set up raw mode to capture keypresses
+		const stdin = process.stdin;
+		stdin.setRawMode(true);
+		stdin.resume();
+		stdin.setEncoding("utf8");
+
+		const cleanup = () => {
+			stdin.setRawMode(false);
+			stdin.removeListener("data", onKeyPress);
+			stdin.pause(); // Allow process to exit
+		};
+
+		const onKeyPress = (key: string) => {
+			// Handle Ctrl+C
+			if (key === "\u0003") {
+				cleanup();
+				console.log(); // New line
+				reject(new Error("Selection cancelled"));
+				process.exit(130);
+				return;
+			}
+
+			// Handle Enter
+			if (key === "\r" || key === "\n") {
+				cleanup();
+				console.log(); // New line
+				resolve(options[selectedIndex]!.value);
+				return;
+			}
+
+			// Handle arrow keys (ANSI escape sequences)
+			if (key === "\u001b[A") {
+				// Up arrow
+				selectedIndex =
+					selectedIndex > 0 ? selectedIndex - 1 : options.length - 1;
+				renderOptions();
+			} else if (key === "\u001b[B") {
+				// Down arrow
+				selectedIndex =
+					selectedIndex < options.length - 1 ? selectedIndex + 1 : 0;
+				renderOptions();
+			} else if (key === "k" || key === "K") {
+				// Vim-style up
+				selectedIndex =
+					selectedIndex > 0 ? selectedIndex - 1 : options.length - 1;
+				renderOptions();
+			} else if (key === "j" || key === "J") {
+				// Vim-style down
+				selectedIndex =
+					selectedIndex < options.length - 1 ? selectedIndex + 1 : 0;
+				renderOptions();
+			}
+		};
+
+		stdin.on("data", onKeyPress);
+	});
+}
+
+/**
  * Ask for file path input with tab-completion
  */
 export async function promptPath(
