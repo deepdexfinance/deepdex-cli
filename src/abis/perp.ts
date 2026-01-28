@@ -406,6 +406,11 @@ export const PerpABI = [
 						type: "uint128",
 					},
 					{
+						internalType: "uint128",
+						name: "mark_price",
+						type: "uint128",
+					},
+					{
 						internalType: "uint64",
 						name: "max_deviation_bps",
 						type: "uint64",

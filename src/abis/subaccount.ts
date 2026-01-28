@@ -6,6 +6,11 @@ export const SubaccountABI = [
 				name: "new_account",
 				type: "address",
 			},
+			{
+				internalType: "uint32",
+				name: "transfer_quota",
+				type: "uint32",
+			},
 		],
 		name: "createOneClickTradingAccount",
 		outputs: [],
@@ -41,6 +46,19 @@ export const SubaccountABI = [
 			},
 		],
 		stateMutability: "view",
+		type: "function",
+	},
+	{
+		inputs: [
+			{
+				internalType: "address",
+				name: "oct_account",
+				type: "address",
+			},
+		],
+		name: "deleteOneClickTradingAccount",
+		outputs: [],
+		stateMutability: "nonpayable",
 		type: "function",
 	},
 	{
@@ -139,6 +157,24 @@ export const SubaccountABI = [
 				type: "address",
 			},
 			{
+				internalType: "bytes",
+				name: "new_name",
+				type: "bytes",
+			},
+		],
+		name: "renameSubaccount",
+		outputs: [],
+		stateMutability: "nonpayable",
+		type: "function",
+	},
+	{
+		inputs: [
+			{
+				internalType: "address",
+				name: "subaccount",
+				type: "address",
+			},
+			{
 				internalType: "address",
 				name: "delegate",
 				type: "address",
@@ -197,44 +233,14 @@ export const SubaccountABI = [
 					{
 						components: [
 							{
+								internalType: "bytes",
+								name: "symbol",
+								type: "bytes",
+							},
+							{
 								internalType: "uint128",
 								name: "token_amount",
 								type: "uint128",
-							},
-							{
-								internalType: "int64",
-								name: "open_bids",
-								type: "int64",
-							},
-							{
-								internalType: "int64",
-								name: "open_asks",
-								type: "int64",
-							},
-							{
-								internalType: "int64",
-								name: "cumulative_deposits",
-								type: "int64",
-							},
-							{
-								internalType: "uint16",
-								name: "market_index",
-								type: "uint16",
-							},
-							{
-								internalType: "uint8",
-								name: "balance_type",
-								type: "uint8",
-							},
-							{
-								internalType: "uint8",
-								name: "open_orders",
-								type: "uint8",
-							},
-							{
-								internalType: "bytes",
-								name: "padding",
-								type: "bytes",
 							},
 						],
 						internalType: "struct Subaccount.SpotPosition[]",

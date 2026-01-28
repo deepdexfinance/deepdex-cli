@@ -18,6 +18,7 @@ import * as order from "./commands/order.ts";
 import * as perp from "./commands/perp.ts";
 import * as pm from "./commands/pm.ts";
 import * as position from "./commands/position.ts";
+import * as quota from "./commands/quota.ts";
 import * as spot from "./commands/spot.ts";
 import * as wallet from "./commands/wallet.ts";
 import { shouldShowHelp, showCommandHelp, showMainHelp } from "./help.ts";
@@ -146,6 +147,11 @@ export async function route(args: ParsedArgs): Promise<void> {
 		// History
 		case "history":
 			await history.run(args);
+			break;
+
+		// Quota
+		case "quota":
+			await routeQuota(secondary, args);
 			break;
 
 		// Health
@@ -398,6 +404,26 @@ async function routeConfig(subcommand: string | undefined, args: ParsedArgs) {
 			break;
 		default:
 			throw new Error(`Unknown config command: ${subcommand}`);
+	}
+}
+
+async function routeQuota(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "info":
+			await quota.info(args);
+			break;
+		case "add":
+			await quota.add(args);
+			break;
+		case "check":
+		case undefined:
+			await quota.check(args);
+			break;
+		case "stats":
+			await quota.stats(args);
+			break;
+		default:
+			throw new Error(`Unknown quota command: ${subcommand}`);
 	}
 }
 

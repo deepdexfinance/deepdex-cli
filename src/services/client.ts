@@ -17,6 +17,7 @@ import { LendingABI } from "../abis/lending.ts";
 import { PerpABI } from "../abis/perp.ts";
 import { SpotABI } from "../abis/spot.ts";
 import { SubaccountABI } from "../abis/subaccount.ts";
+import { SystemABI } from "../abis/system.ts";
 import type {
 	ActiveOrder,
 	MarketPair,
@@ -467,6 +468,7 @@ export async function placePerpOrder(params: {
 		],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -491,6 +493,7 @@ export async function closePosition(
 		args: [subaccount, marketId, price, slippage],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -514,6 +517,7 @@ export async function cancelPerpOrder(
 		args: [subaccount, marketId, orderId],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -547,6 +551,7 @@ export async function placeSpotBuyOrder(params: {
 		],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -580,6 +585,7 @@ export async function placeSpotSellOrder(params: {
 		],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -612,6 +618,7 @@ export async function placeSpotMarketBuy(params: {
 		],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -645,6 +652,7 @@ export async function placeSpotMarketSell(params: {
 		],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -673,6 +681,7 @@ export async function cancelSpotOrder(
 		args: [subaccount, pairId, orderId],
 		account,
 		chain: deepdexTestnet,
+		nonce: Date.now(),
 	});
 
 	return hash;
@@ -1132,4 +1141,51 @@ export async function waitForTransaction(hash: Hex): Promise<{
 		status: receipt.status,
 		blockNumber: receipt.blockNumber,
 	};
+}
+
+// ============================================================================
+// Quota Operations
+// ============================================================================
+
+/**
+ * Get account quota information
+ */
+export async function getAccountQuota(account: Address): Promise<{
+	quota: number;
+	nonce: bigint;
+	isExist: boolean;
+}> {
+	const client = getPublicClient();
+
+	const result = (await client.readContract({
+		address: network.contracts.system as Address,
+		abi: SystemABI,
+		functionName: "systemAccount",
+		args: [account],
+	})) as [bigint, bigint, bigint[], number, boolean];
+
+	return {
+		quota: result[3] || 0, // quota is the 4th field
+		nonce: result[0] || 0n, // nonce is the 1st field
+		isExist: result[4] || false, // is_exist is the 5th field
+	};
+}
+
+/**
+ * Add quota to an account
+ */
+export async function addQuota(account: Address, amount: number): Promise<Hex> {
+	const client = getWalletClient();
+	const signer = getAccount();
+
+	const hash = await client.writeContract({
+		address: network.contracts.system as Address,
+		abi: SystemABI,
+		functionName: "addQuota",
+		args: [account, BigInt(amount)],
+		account: signer,
+		chain: deepdexTestnet,
+	});
+
+	return hash;
 }
