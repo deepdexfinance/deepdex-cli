@@ -35,7 +35,7 @@ import { getAccount } from "./wallet.ts";
 // ============================================================================
 
 export const deepdexTestnet: Chain = {
-	id: 483, // Placeholder chain ID
+	id: network.chainId,
 	name: network.name,
 	nativeCurrency: {
 		name: "tDGAS",

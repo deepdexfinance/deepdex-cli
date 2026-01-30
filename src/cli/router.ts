@@ -159,11 +159,6 @@ export async function route(args: ParsedArgs): Promise<void> {
 			await health.run(args);
 			break;
 
-		// MCP Server
-		case "mcp":
-			await mcp.start(args);
-			break;
-
 		// Bridge
 		case "bridge":
 			await routeBridge(secondary, args);
