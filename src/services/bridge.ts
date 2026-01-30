@@ -12,6 +12,7 @@ import {
 } from "viem";
 import { sepolia } from "viem/chains";
 import BridgeABI from "../abis/bridge.ts";
+import { network } from "../abis/config.ts";
 
 // ============================================================================
 // Types & Constants
@@ -30,7 +31,7 @@ export const BRIDGE_TOKEN_IDS = {
 export type BridgeTokenSymbol = keyof typeof BRIDGE_TOKEN_IDS;
 
 export const CHAIN_IDS = {
-	DEEPDEX_TESTNET: 4833,
+	DEEPDEX_TESTNET: network.chainId,
 	SEPOLIA: 11155111,
 	SOLANA_DEVNET: 1,
 } as const;
