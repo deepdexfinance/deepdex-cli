@@ -242,18 +242,6 @@ deepdex pm start strategy-2 dca --config ./configs/dca.json
 deepdex pm ps    # List running processes
 ```
 
-### MCP Server
-
-Exposes trading functionality to AI models:
-```bash
-export DEEPDEX_WALLET_PASSWORD="your-password"
-deepdex mcp  # Start MCP server
-```
-
-Then configure in Claude Desktop or other MCP clients to enable AI-assisted trading.
-
-## Development Workflow
-
 ### Making Changes
 1. **Code**: Edit TypeScript files in `src/`
 2. **Validate**: Run `bun run lint --write` to auto-fix style issues
