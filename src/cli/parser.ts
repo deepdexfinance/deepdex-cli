@@ -179,6 +179,7 @@ const PARENT_COMMANDS = [
 	"pm",
 	"config",
 	"history",
+	"bridge",
 ];
 
 /**
@@ -215,6 +216,7 @@ function isSubCommandOf(parent: string, subCmd: string): boolean {
 		pm: ["ps", "start", "stop", "restart", "logs", "kill", "stop-all", "list"],
 		config: ["show", "set", "reset", "export", "import"],
 		history: ["trades", "transfers"],
+		bridge: ["chains", "fees", "deposit", "withdraw", "status"],
 	};
 
 	return subCommands[parent]?.includes(subCmd) ?? false;

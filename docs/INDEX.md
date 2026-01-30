@@ -91,6 +91,13 @@ Quick reference to find what you need.
 - Health: [Health Checks](./guides/15-health-checks.md) - `health`
 - MCP: [MCP Server](./guides/17-mcp-server.md) - `mcp`
 
+### Bridge Commands
+- `bridge chains` - List supported chains (Sepolia, Solana Devnet)
+- `bridge fees <chain> <amount> <token>` - Estimate bridge fees
+- `bridge deposit <chain> <amount> <token>` - Deposit from external chain to DeepDEX
+- `bridge withdraw <chain> <amount> <token>` - Withdraw from DeepDEX to external chain
+- `bridge status <txHash>` - Check bridge transaction status
+
 ---
 
 ## 📚 All Guides

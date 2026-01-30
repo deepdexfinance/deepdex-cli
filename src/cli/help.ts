@@ -163,12 +163,9 @@ const COMMANDS: Record<string, CommandHelp> = {
 		options: [{ flag: "--account, -a", description: "Source subaccount name" }],
 	},
 	faucet: {
-		description: "Mint testnet tokens",
-		usage: "deepdex faucet [--token <USDC|tDGAS>]",
-		examples: ["deepdex faucet", "deepdex faucet --token tDGAS"],
-		options: [
-			{ flag: "--token", description: "Token to mint (default: USDC)" },
-		],
+		description: "Request 1000 USDC from faucet API",
+		usage: "deepdex faucet",
+		examples: ["deepdex faucet"],
 	},
 	market: {
 		description: "Market data commands",

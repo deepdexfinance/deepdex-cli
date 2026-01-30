@@ -2,8 +2,10 @@ import { describe, expect, it } from "bun:test";
 import {
 	decrypt,
 	encrypt,
+	generateMnemonic,
 	generatePrivateKey,
 	isValidPrivateKey,
+	secureWipe,
 	sha256,
 } from "./crypto";
 
@@ -117,5 +119,48 @@ describe("isValidPrivateKey", () => {
 		const upperKey =
 			"0xABCDEF7890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF";
 		expect(isValidPrivateKey(upperKey)).toBe(true);
+	});
+});
+
+describe("generateMnemonic", () => {
+	it("should generate a 12-word mnemonic", () => {
+		const mnemonic = generateMnemonic();
+		const words = mnemonic.split(" ");
+		expect(words.length).toBe(12);
+	});
+
+	it("should generate words from the word list", () => {
+		const mnemonic = generateMnemonic();
+		const words = mnemonic.split(" ");
+		// Each word should be a valid word (alphabetic)
+		for (const word of words) {
+			expect(/^[a-z]+$/.test(word)).toBe(true);
+		}
+	});
+
+	it("should generate different mnemonics each time", () => {
+		const mnemonic1 = generateMnemonic();
+		const mnemonic2 = generateMnemonic();
+		// Very unlikely to be the same
+		expect(mnemonic1).not.toBe(mnemonic2);
+	});
+});
+
+describe("secureWipe", () => {
+	it("should zero out a buffer", () => {
+		const buffer = Buffer.from([1, 2, 3, 4, 5]);
+		secureWipe(buffer);
+		expect(buffer.every((byte) => byte === 0)).toBe(true);
+	});
+
+	it("should handle string input without throwing", () => {
+		// Strings can't be truly wiped in JS, but function should handle it
+		const str = "sensitive data";
+		expect(() => secureWipe(str)).not.toThrow();
+	});
+
+	it("should handle empty buffer", () => {
+		const buffer = Buffer.alloc(0);
+		expect(() => secureWipe(buffer)).not.toThrow();
 	});
 });

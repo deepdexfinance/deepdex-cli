@@ -7,6 +7,7 @@ import { consola } from "consola";
 import * as account from "./commands/account.ts";
 import * as balance from "./commands/balance.ts";
 import * as bot from "./commands/bot.ts";
+import * as bridge from "./commands/bridge.ts";
 import * as config from "./commands/config.ts";
 import * as faucet from "./commands/faucet.ts";
 import * as health from "./commands/health.ts";
@@ -162,6 +163,11 @@ export async function route(args: ParsedArgs): Promise<void> {
 		// MCP Server
 		case "mcp":
 			await mcp.start(args);
+			break;
+
+		// Bridge
+		case "bridge":
+			await routeBridge(secondary, args);
 			break;
 
 		default:
@@ -424,6 +430,32 @@ async function routeQuota(subcommand: string | undefined, args: ParsedArgs) {
 			break;
 		default:
 			throw new Error(`Unknown quota command: ${subcommand}`);
+	}
+}
+
+async function routeBridge(subcommand: string | undefined, args: ParsedArgs) {
+	switch (subcommand) {
+		case "chains":
+			await bridge.chains(args);
+			break;
+		case "fees":
+			await bridge.fees(args);
+			break;
+		case "deposit":
+			await bridge.deposit(args);
+			break;
+		case "withdraw":
+			await bridge.withdraw(args);
+			break;
+		case "status":
+			await bridge.status(args);
+			break;
+		case "help":
+		case undefined:
+			await bridge.help();
+			break;
+		default:
+			throw new Error(`Unknown bridge command: ${subcommand}`);
 	}
 }
 

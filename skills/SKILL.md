@@ -177,6 +177,16 @@ deepdex quota add <address> <amount>          # Add quota to account
 deepdex quota stats                           # Show quota statistics
 ```
 
+### Cross-Chain Bridge
+
+```bash
+deepdex bridge chains                         # List supported chains
+deepdex bridge fees <chain> <amount> <token>  # Estimate bridge fees
+deepdex bridge deposit <chain> <amount> <token>   # Deposit from external chain
+deepdex bridge withdraw <chain> <amount> <token>  # Withdraw to external chain
+deepdex bridge status <txHash>                # Check transaction status
+```
+
 ### System & Config
 
 ```bash
