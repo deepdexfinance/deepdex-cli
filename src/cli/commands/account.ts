@@ -153,7 +153,7 @@ export async function list(args: ParsedArgs): Promise<void> {
 export async function info(args: ParsedArgs): Promise<void> {
 	ensureWallet();
 
-	const accountName = getFlag<string>(args.raw, "account") || "default";
+	const accountName = getFlag<string>(args.raw, "account") || "main";
 	const address = getStoredAddress()!;
 
 	consola.start("Fetching account info...");
@@ -218,7 +218,7 @@ export async function deposit(args: ParsedArgs): Promise<void> {
 
 	const amountStr = requireArg(args.positional, 0, "amount");
 	const tokenSymbol = requireArg(args.positional, 1, "token").toUpperCase();
-	const accountName = getFlag<string>(args.raw, "account") || "default";
+	const accountName = getFlag<string>(args.raw, "account") || "main";
 
 	// Validate token
 	const tokenInfo = Object.values(network.tokens).find(
@@ -319,7 +319,7 @@ export async function withdraw(args: ParsedArgs): Promise<void> {
 
 	const amountStr = requireArg(args.positional, 0, "amount");
 	const token = requireArg(args.positional, 1, "token").toUpperCase();
-	const accountName = getFlag<string>(args.raw, "account") || "default";
+	const accountName = getFlag<string>(args.raw, "account") || "main";
 
 	// Validate token
 	const tokenInfo = Object.values(network.tokens).find(
@@ -414,7 +414,7 @@ export async function delegate(args: ParsedArgs): Promise<void> {
 	await ensureUnlocked();
 
 	const delegateTo = requireArg(args.positional, 0, "address");
-	const accountName = getFlag<string>(args.raw, "account") || "default";
+	const accountName = getFlag<string>(args.raw, "account") || "main";
 
 	// Validate address
 	if (!delegateTo.startsWith("0x") || delegateTo.length !== 42) {
